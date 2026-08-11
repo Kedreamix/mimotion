@@ -9,3 +9,10 @@ next cron:
 UTC时间: '2 1,4,7,10,12,14 * * *'
 北京时间: '2 9,12,15,18,20,22 * * *'
 next exec time: UTC(1:2) 北京时间(9:2)
+---STEP_STATE---
+{
+  "2febc6aded165332e2ca87a31a9be7bf": {
+    "last_step": 191,
+    "last_step_date": "2026-08-12"
+  }
+}
