@@ -262,13 +262,13 @@ class MiMotionRunner:
         step, last_step = pick_incremental_step(self.user, min_step, max_step)
         step = str(step)
         self.log_str += (
-            f"已设置为递增步数范围({min_step}~{max_step}) "
+            f"已设置为递增范围({min_step}~{max_step}) "
             f"上次:{last_step} 本次:{step}\n"
         )
         ok, msg = zeppHelper.post_fake_brand_data(step, app_token, self.user_id)
         if ok:
             save_last_step(self.user, step)
-        return f"修改步数（{step}）[" + msg + "]", ok
+        return f"同步完成（{step}）[" + msg + "]", ok
 
 
 def run_single_account(total, idx, user_mi, passwd_mi):

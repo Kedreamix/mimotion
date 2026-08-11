@@ -262,7 +262,7 @@ def post_fake_brand_data(step, app_token, userid):
 
     response = requests.post(url, data=data, headers=head)
     if response.status_code != 200:
-        return False, "请求修改步数异常：%d" % response.status_code
+        return False, "请求异常：%d" % response.status_code
     response = response.json()
     message = response["message"]
     if message == "success":
