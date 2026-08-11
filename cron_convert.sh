@@ -78,6 +78,11 @@ function convert_utc_to_shanghai {
 function persist_execute_log {
   local event_name=$1
   local new_cron_hours=$2
+  local step_state_tmp
+  step_state_tmp=$(mktemp)
+  if [[ -f cron_change_time ]] && grep -q '^---STEP_STATE---$' cron_change_time; then
+    awk '/^---STEP_STATE---$/{flag=1} flag' cron_change_time > "$step_state_tmp"
+  fi
   echo "trigger by: ${event_name}" > cron_change_time
   {
     echo "current system time:"
@@ -106,6 +111,10 @@ function persist_execute_log {
     convert_utc_to_shanghai "$current_cron"
     inspect_next "$current_cron"
   } >> cron_change_time
+  if [[ -s "$step_state_tmp" ]]; then
+    cat "$step_state_tmp" >> cron_change_time
+  fi
+  rm -f "$step_state_tmp"
 
 }
 

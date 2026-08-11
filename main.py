@@ -5,6 +5,7 @@ from datetime import datetime
 import pytz
 import uuid
 
+import hashlib
 import json
 import random
 import re
@@ -31,6 +32,82 @@ def get_min_max_by_time(hour=None, minute=None):
     min_step = get_int_value_default(config, 'MIN_STEP', 18000)
     max_step = get_int_value_default(config, 'MAX_STEP', 25000)
     return int(time_rate * min_step), int(time_rate * max_step)
+
+
+def today_bj():
+    return time_bj.strftime("%Y-%m-%d")
+
+
+STEP_STATE_MARKER = "---STEP_STATE---"
+CRON_CHANGE_TIME_PATH = "cron_change_time"
+
+
+def _step_state_key(user_key):
+    return hashlib.sha256(user_key.encode("utf-8")).hexdigest()[:32]
+
+
+def load_step_state():
+    if not os.path.exists(CRON_CHANGE_TIME_PATH):
+        return {}
+    try:
+        with open(CRON_CHANGE_TIME_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+        if STEP_STATE_MARKER not in content:
+            return {}
+        raw = content.split(STEP_STATE_MARKER, 1)[1].strip()
+        if not raw:
+            return {}
+        return json.loads(raw)
+    except:
+        return {}
+
+
+def persist_step_state():
+    cron_text = ""
+    if os.path.exists(CRON_CHANGE_TIME_PATH):
+        with open(CRON_CHANGE_TIME_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+        cron_text = content.split(STEP_STATE_MARKER, 1)[0].rstrip()
+    else:
+        cron_text = "trigger by: init"
+    state_json = json.dumps(step_state, ensure_ascii=False, indent=2)
+    with open(CRON_CHANGE_TIME_PATH, "w", encoding="utf-8") as f:
+        f.write(cron_text)
+        f.write("\n")
+        f.write(STEP_STATE_MARKER)
+        f.write("\n")
+        f.write(state_json)
+        f.write("\n")
+
+
+# 在时间区间内随机，并保证相对上次成功提交严格递增（按天重置）
+def pick_incremental_step(user_key, min_step, max_step):
+    abs_max = get_int_value_default(config, 'MAX_STEP', 25000)
+    state_key = _step_state_key(user_key)
+    info = step_state.get(state_key) or {}
+    last_date = info.get("last_step_date")
+    last_step = int(info.get("last_step") or 0)
+    if last_date != today_bj():
+        last_step = 0
+
+    low = max(min_step, last_step + 1) if last_step > 0 else min_step
+    high = max_step
+    if low > high:
+        if last_step >= abs_max:
+            step = abs_max
+        else:
+            step = min(abs_max, last_step + 1)
+    else:
+        step = random.randint(low, high)
+    return step, last_step
+
+
+def save_last_step(user_key, step):
+    state_key = _step_state_key(user_key)
+    step_state[state_key] = {
+        "last_step": int(step),
+        "last_step_date": today_bj(),
+    }
 
 
 # 虚拟ip地址
@@ -182,9 +259,15 @@ class MiMotionRunner:
         if app_token is None:
             return "登陆失败！", False
 
-        step = str(random.randint(min_step, max_step))
-        self.log_str += f"已设置为随机步数范围({min_step}~{max_step}) 随机值:{step}\n"
+        step, last_step = pick_incremental_step(self.user, min_step, max_step)
+        step = str(step)
+        self.log_str += (
+            f"已设置为递增步数范围({min_step}~{max_step}) "
+            f"上次:{last_step} 本次:{step}\n"
+        )
         ok, msg = zeppHelper.post_fake_brand_data(step, app_token, self.user_id)
+        if ok:
+            save_last_step(self.user, step)
         return f"修改步数（{step}）[" + msg + "]", ok
 
 
@@ -218,8 +301,8 @@ def execute():
         if use_concurrent:
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                exec_results = executor.map(lambda x: run_single_account(total, x[0], *x[1]),
-                                            enumerate(zip(user_list, passwd_list)))
+                exec_results = list(executor.map(lambda x: run_single_account(total, x[0], *x[1]),
+                                            enumerate(zip(user_list, passwd_list))))
         else:
             for user_mi, passwd_mi in zip(user_list, passwd_list):
                 exec_results.append(run_single_account(total, idx, user_mi, passwd_mi))
@@ -229,6 +312,7 @@ def execute():
                     time.sleep(sleep_seconds)
         if encrypt_support:
             persist_user_tokens()
+        persist_step_state()
         success_count = 0
         push_results = []
         for result in exec_results:
@@ -274,6 +358,7 @@ if __name__ == "__main__":
     time_bj = get_beijing_time()
     encrypt_support = False
     user_tokens = dict()
+    step_state = load_step_state()
     if os.environ.__contains__("AES_KEY") is True:
         aes_key = os.environ.get("AES_KEY")
         if aes_key is not None:

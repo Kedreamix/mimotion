@@ -158,13 +158,18 @@ def not_in_push_time_range(config: PushConfig) -> bool:
             return False
 
     # 如果时间不匹配，检查cron_change_time文件中的记录
-    # 读取cron_change_time文件中的最后一行数据：“next exec time: UTC(7:35) 北京时间(15:35)” 中的整点数
+    # 读取 “next exec time: UTC(7:35) 北京时间(15:35)” 中的整点数
     # 然后用来对比是否当前时间，避免因为Actions执行延迟导致推送失效
     try:
         with open('cron_change_time', 'r') as f:
             lines = f.readlines()
             if lines:
-                last_line = lines[-1].strip()
+                last_line = ''
+                for line in lines:
+                    if line.startswith('next exec time:'):
+                        last_line = line.strip()
+                if not last_line:
+                    last_line = lines[-1].strip()
                 # 提取北京时间的小时数
                 import re
                 match = re.search(r'北京时间\(0?(\d+):\d+\)', last_line)
