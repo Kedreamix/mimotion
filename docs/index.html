@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#07090d" />
+  <title>mimotion 看板</title>
+  <meta name="description" content="Zepp Life / 小米运动自动刷步状态看板" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <h1>mimotion</h1>
+        <p>Zepp Life 自动刷步看板</p>
+      </div>
+    </div>
+    <div class="top-meta">
+      <time id="clock" datetime="">--:--:--</time>
+      <span class="tz">北京时间</span>
+      <button id="refresh" type="button">刷新</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 220 220" aria-hidden="true">
+          <circle class="ring-track" cx="110" cy="110" r="92" />
+          <circle class="ring-value" id="ring-value" cx="110" cy="110" r="92" />
+        </svg>
+        <div class="ring-center">
+          <span class="ring-label">最近步数</span>
+          <strong id="last-step">—</strong>
+          <span class="ring-sub" id="step-date">等待数据</span>
+        </div>
+      </div>
+
+      <div class="hero-side">
+        <div class="status-card" id="status-card">
+          <span class="status-dot" id="status-dot"></span>
+          <div>
+            <p class="kicker">当前状态</p>
+            <h2 id="status-text">加载中</h2>
+            <p class="muted" id="status-detail">正在读取仓库与 Actions 记录</p>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <article>
+            <p class="kicker">上次同步</p>
+            <strong id="last-sync">—</strong>
+            <span id="last-sync-rel" class="muted"></span>
+          </article>
+          <article>
+            <p class="kicker">下次执行</p>
+            <strong id="next-run">—</strong>
+            <span id="next-run-rel" class="muted"></span>
+          </article>
+          <article>
+            <p class="kicker">今日刷步</p>
+            <strong id="today-count">—</strong>
+            <span id="today-rate" class="muted"></span>
+          </article>
+          <article>
+            <p class="kicker">账号</p>
+            <strong id="account-count">—</strong>
+            <span class="muted">脱敏哈希，不含密码</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>今日时间轴</h2>
+        <p class="muted" id="cron-caption">按北京时间显示计划整点</p>
+      </div>
+      <ol class="timeline" id="timeline"></ol>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>最近执行</h2>
+        <a id="actions-link" href="#" target="_blank" rel="noreferrer">打开 Actions</a>
+      </div>
+      <ul class="runs" id="runs"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>数据来自公开仓库文件 <code>cron_change_time</code> 与 GitHub Actions，不含账号密码。</p>
+    <p>
+      <a id="repo-link" href="#" target="_blank" rel="noreferrer">仓库</a>
+      ·
+      <a id="workflow-link" href="#" target="_blank" rel="noreferrer">刷步工作流</a>
+    </p>
+  </footer>
+  <script src="./app.js"></script>
+</body>
+</html>
