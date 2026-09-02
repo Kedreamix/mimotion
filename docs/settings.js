@@ -19,6 +19,7 @@
   $("vars-link").href = `${htmlBase}/settings/variables/actions`;
   $("secrets-link").href = `${htmlBase}/settings/secrets/actions`;
   $("update-workflow-link").href = `${htmlBase}/actions/workflows/update-params.yml`;
+  $("run-workflow-link").href = `${htmlBase}/actions/workflows/run.yml`;
 
   function authHeaders(token) {
     return {
@@ -225,11 +226,81 @@
       return;
     }
     try {
-      const pairs = collectTunable(schemaCache).filter((item) => item.value !== "");
-      for (const item of pairs) await setVariable(token, item.name, item.value);
-      showStatus(`已写入 ${pairs.map((item) => item.name).join(", ")}。改定时后请手动跑 Random Cron，或等下次刷步成功。`, true);
+      const pairs = await persistTunable(token);
+      showStatus(`已写入 ${pairs.map((item) => item.name).join(", ") || "无变更"}。改定时后请点「应用新定时」，或等下次刷步成功。`, true);
     } catch (err) {
       showStatus(String(err.message || err) + "。PAT 需要 Variables 读写权限。", false);
+    }
+  });
+
+  async function persistTunable(token) {
+    const api = window.MimoApi;
+    const pairs = collectTunable(schemaCache).filter((item) => item.value !== "");
+    for (const item of pairs) await api.setVariable(token, item.name, item.value);
+    return pairs;
+  }
+
+  function tokenOrHint(action) {
+    const api = window.MimoApi;
+    const token = api.getPat();
+    if (!token) {
+      showStatus(api.needPat(action).message, false);
+      return "";
+    }
+    api.savePat(token);
+    return token;
+  }
+
+  $("run-now").addEventListener("click", async () => {
+    const token = tokenOrHint("马上刷步");
+    if (!token) return;
+    try {
+      const form = $("tunable-form").elements;
+      const inputs = {};
+      if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
+      if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
+      await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
+      showStatus("已触发马上刷步，几秒后回看板刷新即可看到结果。", true);
+    } catch (err) {
+      showStatus(String(err.message || err), false);
+    }
+  });
+
+  $("save-and-run").addEventListener("click", async () => {
+    const token = tokenOrHint("保存并刷步");
+    if (!token) return;
+    try {
+      await persistTunable(token);
+      const form = $("tunable-form").elements;
+      const inputs = {};
+      if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
+      if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
+      await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
+      showStatus("已保存参数并触发马上刷步。", true);
+    } catch (err) {
+      showStatus(String(err.message || err), false);
+    }
+  });
+
+  $("apply-cron").addEventListener("click", async () => {
+    const token = tokenOrHint("应用新定时");
+    if (!token) return;
+    try {
+      await window.MimoApi.dispatchWorkflow(token, "cron.yml", {});
+      showStatus("已触发 Random Cron，会按 CRON_HOURS 更新下次执行时间。", true);
+    } catch (err) {
+      showStatus(String(err.message || err), false);
+    }
+  });
+
+  $("refresh-pages").addEventListener("click", async () => {
+    const token = tokenOrHint("刷新看板");
+    if (!token) return;
+    try {
+      await window.MimoApi.dispatchWorkflow(token, "pages.yml", {});
+      showStatus("已触发看板重新发布。", true);
+    } catch (err) {
+      showStatus(String(err.message || err), false);
     }
   });
 

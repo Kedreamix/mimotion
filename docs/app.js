@@ -76,8 +76,17 @@
   }
 
   function applyParams(params) {
-    const n = Number(params && params.MAX_STEP);
-    if (Number.isFinite(n) && n > 0) stepGoal = n;
+    const max = Number(params && params.MAX_STEP);
+    const min = Number(params && params.MIN_STEP);
+    if (Number.isFinite(max) && max > 0) {
+      stepGoal = max;
+      const maxInput = document.getElementById("op-max");
+      if (maxInput && !maxInput.value) maxInput.value = String(max);
+    }
+    if (Number.isFinite(min) && min > 0) {
+      const minInput = document.getElementById("op-min");
+      if (minInput && !minInput.value) minInput.value = String(min);
+    }
   }
 
   function parseCronFile(text) {
@@ -290,5 +299,107 @@
     const p = beijingParts();
     $("clock").textContent = `${pad(p.h)}:${pad(p.min)}:${pad(p.s)}`;
   }, 1000);
+
+  const api = window.MimoApi;
+  $("run-workflow-link").href = `${htmlBase}/actions/workflows/run.yml`;
+  const patInput = $("pat");
+  if (patInput) patInput.value = localStorage.getItem(api.PAT_KEY) || "";
+
+  function showOps(text, ok) {
+    const el = $("ops-status");
+    el.hidden = false;
+    el.className = "banner " + (ok ? "ok" : "bad");
+    el.textContent = text;
+  }
+
+  function stepInputs() {
+    return {
+      min: ($("op-min").value || "").trim(),
+      max: ($("op-max").value || "").trim(),
+    };
+  }
+
+  function requirePat(action) {
+    const token = api.getPat();
+    if (!token) {
+      showOps(api.needPat(action).message, false);
+      return "";
+    }
+    api.savePat(token);
+    return token;
+  }
+
+  async function dispatchRun(token) {
+    const { min, max } = stepInputs();
+    const inputs = {};
+    if (min) inputs.min_step = min;
+    if (max) inputs.max_step = max;
+    await api.dispatchWorkflow(token, "run.yml", inputs);
+  }
+
+  $("run-now").addEventListener("click", async () => {
+    const token = requirePat("马上刷步");
+    if (!token) return;
+    try {
+      await dispatchRun(token);
+      showOps("已触发马上刷步，几秒后刷新看板可看到新记录。", true);
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    }
+  });
+
+  $("save-steps").addEventListener("click", async () => {
+    const token = requirePat("保存步数范围");
+    if (!token) return;
+    const { min, max } = stepInputs();
+    if (!min && !max) {
+      showOps("请先填写最小或最大步数。", false);
+      return;
+    }
+    try {
+      if (min) await api.setVariable(token, "MIN_STEP", min);
+      if (max) await api.setVariable(token, "MAX_STEP", max);
+      showOps("已保存步数范围到仓库变量。", true);
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    }
+  });
+
+  $("save-and-run").addEventListener("click", async () => {
+    const token = requirePat("保存并刷步");
+    if (!token) return;
+    const { min, max } = stepInputs();
+    try {
+      if (min) await api.setVariable(token, "MIN_STEP", min);
+      if (max) await api.setVariable(token, "MAX_STEP", max);
+      await dispatchRun(token);
+      showOps("已保存步数范围并触发马上刷步。", true);
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    }
+  });
+
+  $("apply-cron").addEventListener("click", async () => {
+    const token = requirePat("应用新定时");
+    if (!token) return;
+    try {
+      await api.dispatchWorkflow(token, "cron.yml", {});
+      showOps("已触发 Random Cron，会按 CRON_HOURS 换上下一次整点。", true);
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    }
+  });
+
+  $("refresh-pages").addEventListener("click", async () => {
+    const token = requirePat("刷新看板");
+    if (!token) return;
+    try {
+      await api.dispatchWorkflow(token, "pages.yml", {});
+      showOps("已触发看板重新发布，大约半分钟后刷新页面。", true);
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    }
+  });
+
   refresh();
 })();

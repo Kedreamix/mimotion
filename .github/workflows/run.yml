@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: '55 1,4,7,10,12,14 * * *'
   workflow_dispatch:
+    inputs:
+      min_step:
+        description: 本次最小步数（留空则用仓库变量 / CONFIG）
+        required: false
+      max_step:
+        description: 本次最大步数（留空则用仓库变量 / CONFIG）
+        required: false
 
 jobs:
   build:
@@ -29,8 +36,8 @@ jobs:
             CONFIG: ${{ secrets.CONFIG }}
             AES_KEY: ${{ secrets.AES_KEY }}
             REPO_VARS: ${{ toJSON(vars) }}
-            MIN_STEP: ${{ vars.MIN_STEP }}
-            MAX_STEP: ${{ vars.MAX_STEP }}
+            MIN_STEP: ${{ github.event.inputs.min_step || vars.MIN_STEP }}
+            MAX_STEP: ${{ github.event.inputs.max_step || vars.MAX_STEP }}
             SLEEP_GAP: ${{ vars.SLEEP_GAP }}
             USE_CONCURRENT: ${{ vars.USE_CONCURRENT }}
             PUSH_PLUS_HOUR: ${{ vars.PUSH_PLUS_HOUR }}

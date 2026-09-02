@@ -27,11 +27,12 @@
 - 填写token的名称，用于自己区别干嘛用的。
 - 选择token有效期，最大时长为1年。一年后需要重新续期或重建，唯一缺点
 - `Repository access` 选择 `Only select repositories` 勾选自己fork后的仓库，下拉可搜索：输入 mimotion 进行检索
-- 点击 `Repository permissions` 展开菜单，并勾选以下四个权限即可，其他的可以不勾选
-    - `Actions` Access: `Read and write` 用于获取Actions的权限
+- 点击 `Repository permissions` 展开菜单，并勾选以下权限即可，其他的可以不勾选
+    - `Actions` Access: `Read and write` 用于获取 Actions 权限，以及页面上的「马上刷步」
     - `Contents` Access: `Read and write` 用于更新定时任务和日志文件的权限
     - `Metadata` Access: `Read-only` 这个自带的必选
     - `Workflows` Access: `Read and write` 获取用于更新 `.github/workflow` 下文件的权限
+    - `Variables` Access: `Read and write` 用于参数页保存最小/最大步数和执行整点
 
 #### 你也可以创建更大权限的不限时token
 
@@ -236,9 +237,19 @@
 
 三种改 Variables 的方式：
 
-1. 打开参数页，可选填 PAT（只存在本机 `localStorage`，不会提交）。Fine-grained token 需要额外勾选 `Variables: Read and write`。
-2. 不想把 PAT 放浏览器：到 Actions 手动跑 `更新参数`，它使用仓库里的 `secrets.PAT`。
+1. 打开参数页或看板的「马上操作」，可选填 PAT（只存在本机）。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
+2. 不想把 PAT 放浏览器：到 Actions 手动跑 `刷步数` / `更新参数`，它们使用仓库里的 `secrets.PAT`。
 3. 直接打开 [仓库 Variables](../../settings/variables/actions) 手工填写。`CRON_HOURS` 这里必须填 UTC。
+
+看板和参数页还接了这些接口：
+
+- **马上刷步**：触发 `刷步数` 工作流。可带上这一次的最小/最大步数，不改默认值。
+- **保存步数范围**：把最小/最大写入 Variables，之后定时任务也用这组值。
+- **保存并刷步**：先保存再立刻跑一次。
+- **应用新定时**：触发 `Random Cron`，按 `CRON_HOURS` 换上下一次整点。
+- **刷新看板**：重新发布 GitHub Pages 快照。
+
+没有接「提取配置信息」：那会把密码推到聊天里，不适合放在公开页面上。
 
 #### 以后加一个新参数
 

@@ -31,15 +31,23 @@
     <p id="status" class="banner" hidden></p>
     <section class="panel">
       <div class="panel-head">
-        <h2>怎么存</h2>
+        <h2>写入凭证</h2>
       </div>
-      <p class="muted">不要把密码写进公开页面。后续加新旋钮：先改 <code>docs/params.json</code>，再在 <code>run.yml</code> 里加一行 <code>vars.新参数</code>。仓库变量会覆盖 CONFIG 里的同名字段。</p>
+      <p class="muted">PAT 只存在这个浏览器。马上刷步需要 <code>Actions</code> 读写，保存步数需要 <code>Variables</code> 读写。不填也可以去 Actions 手动跑。</p>
+      <label class="field">PAT
+        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
+      </label>
+      <div class="actions">
+        <button id="save-pat" type="button">保存在本机</button>
+        <button id="clear-pat" type="button">清除</button>
+        <button id="load-vars" type="button">读取当前变量</button>
+      </div>
     </section>
 
     <section class="panel">
       <div class="panel-head">
         <h2>常用参数</h2>
-        <span class="muted">写入 GitHub Variables</span>
+        <span class="muted">最小/最大步数、整点等写入 GitHub Variables</span>
       </div>
       <form id="tunable-form" class="form-grid"></form>
       <div class="actions">
@@ -52,17 +60,17 @@
 
     <section class="panel">
       <div class="panel-head">
-        <h2>写入凭证</h2>
+        <h2>马上操作</h2>
+        <span class="muted">触发仓库里已有的工作流</span>
       </div>
-      <p class="muted">PAT 只存在这个浏览器，不会上传到仓库。需要 Fine-grained 权限：<code>Variables</code> 读写。不填 PAT 时，请复制清单到仓库变量页，或跑「更新参数」工作流。</p>
-      <label class="field">PAT
-        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
-      </label>
       <div class="actions">
-        <button id="save-pat" type="button">保存在本机</button>
-        <button id="clear-pat" type="button">清除</button>
-        <button id="load-vars" type="button">读取当前变量</button>
+        <button id="run-now" class="primary" type="button">马上刷步</button>
+        <button id="save-and-run" type="button">保存参数并刷步</button>
+        <button id="apply-cron" type="button">应用新定时</button>
+        <button id="refresh-pages" type="button">刷新看板</button>
+        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 手动跑刷步</a>
       </div>
+      <p class="muted">马上刷步会带上当前填的最小/最大步数作为这一次的范围。保存参数并刷步会先写入 Variables。</p>
     </section>
 
     <section class="panel">
@@ -81,6 +89,7 @@
   <footer>
     <p>变量覆盖 CONFIG。改 <code>CRON_HOURS</code> 后，下次刷步成功或手动跑 Random Cron 才会换上新整点。</p>
   </footer>
+  <script src="./api.js"></script>
   <script src="./settings.js"></script>
 </body>
 </html>
