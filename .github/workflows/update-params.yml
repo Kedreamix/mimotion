@@ -1,0 +1,63 @@
+name: 更新参数
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_step:
+        description: 最小步数（留空不改）
+        required: false
+      max_step:
+        description: 最大步数（留空不改）
+        required: false
+      cron_hours_bj:
+        description: 北京时间整点，逗号分隔，如 8,10,12,14,16,22（留空不改）
+        required: false
+      sleep_gap:
+        description: 多账号间隔秒（留空不改）
+        required: false
+      use_concurrent:
+        description: True 或 False（留空不改）
+        required: false
+      push_plus_hour:
+        description: PushPlus 仅该整点推送（留空不改，填 none 表示清空）
+        required: false
+      push_plus_max:
+        description: PushPlus 详情上限（留空不改）
+        required: false
+      params_json:
+        description: 可选，额外参数 JSON，键名与 docs/params.json 一致（留空的键不改）
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 写入仓库 Variables
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+          MIN_STEP: ${{ inputs.min_step }}
+          MAX_STEP: ${{ inputs.max_step }}
+          CRON_HOURS_BJ: ${{ inputs.cron_hours_bj }}
+          SLEEP_GAP: ${{ inputs.sleep_gap }}
+          USE_CONCURRENT: ${{ inputs.use_concurrent }}
+          PUSH_PLUS_HOUR: ${{ inputs.push_plus_hour }}
+          PUSH_PLUS_MAX: ${{ inputs.push_plus_max }}
+          PARAMS_JSON: ${{ inputs.params_json }}
+        run: python3 .github/scripts/update_params.py
+
+      - name: 刷新看板并应用定时
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+        run: |
+          gh workflow run pages.yml --ref master || true
+          if [ -n "${{ inputs.cron_hours_bj }}" ]; then
+            gh workflow run cron.yml --ref master || true
+          fi

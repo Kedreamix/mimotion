@@ -28,6 +28,13 @@ jobs:
         env:
             CONFIG: ${{ secrets.CONFIG }}
             AES_KEY: ${{ secrets.AES_KEY }}
+            REPO_VARS: ${{ toJSON(vars) }}
+            MIN_STEP: ${{ vars.MIN_STEP }}
+            MAX_STEP: ${{ vars.MAX_STEP }}
+            SLEEP_GAP: ${{ vars.SLEEP_GAP }}
+            USE_CONCURRENT: ${{ vars.USE_CONCURRENT }}
+            PUSH_PLUS_HOUR: ${{ vars.PUSH_PLUS_HOUR }}
+            PUSH_PLUS_MAX: ${{ vars.PUSH_PLUS_MAX }}
         run: |
           pip3 install requests pytz pycryptodome
           python3 main.py

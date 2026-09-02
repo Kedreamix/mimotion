@@ -1,0 +1,89 @@
+{
+  "tunable": [
+    {
+      "key": "MIN_STEP",
+      "label": "最小步数",
+      "type": "number",
+      "default": "18000",
+      "help": "会随时间线性放大，北京时间 22 点达到这个下限。"
+    },
+    {
+      "key": "MAX_STEP",
+      "label": "最大步数",
+      "type": "number",
+      "default": "25000",
+      "help": "北京时间 22 点达到这个上限。看板圆环也用这个值当目标。"
+    },
+    {
+      "key": "CRON_HOURS_BJ",
+      "label": "执行整点",
+      "type": "bj-hours",
+      "variable": "CRON_HOURS",
+      "default": "8,10,12,14,16,22",
+      "help": "按北京时间勾选。保存时自动换成 UTC，写入仓库变量 CRON_HOURS。"
+    },
+    {
+      "key": "SLEEP_GAP",
+      "label": "多账号间隔（秒）",
+      "type": "number",
+      "default": "5",
+      "help": "账号较多时可改小。开启多线程后无效。"
+    },
+    {
+      "key": "USE_CONCURRENT",
+      "label": "多线程",
+      "type": "select",
+      "options": ["False", "True"],
+      "default": "False",
+      "help": "实验性功能。True 时不再使用 SLEEP_GAP。"
+    },
+    {
+      "key": "PUSH_PLUS_HOUR",
+      "label": "PushPlus 整点",
+      "type": "number",
+      "default": "",
+      "help": "只在该北京时间整点推送。留空表示每次都推。"
+    },
+    {
+      "key": "PUSH_PLUS_MAX",
+      "label": "PushPlus 详情上限",
+      "type": "number",
+      "default": "30",
+      "help": "超过后只推送成功/失败摘要。"
+    }
+  ],
+  "secretConfig": [
+    {
+      "key": "USER",
+      "label": "账号",
+      "type": "text",
+      "help": "Zepp Life 手机号或邮箱，多个账号用 # 分隔。"
+    },
+    {
+      "key": "PWD",
+      "label": "密码",
+      "type": "password",
+      "help": "与账号数量必须一致，用 # 分隔。"
+    },
+    {
+      "key": "PUSH_PLUS_TOKEN",
+      "label": "PushPlus Token",
+      "type": "password"
+    },
+    {
+      "key": "PUSH_WECHAT_WEBHOOK_KEY",
+      "label": "企业微信 Webhook Key",
+      "type": "password"
+    },
+    {
+      "key": "TELEGRAM_BOT_TOKEN",
+      "label": "Telegram Bot Token",
+      "type": "password"
+    },
+    {
+      "key": "TELEGRAM_CHAT_ID",
+      "label": "Telegram Chat ID",
+      "type": "text"
+    }
+  ]
+}

@@ -4,15 +4,48 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from util.params import load_schema, runtime_keys
 
 OWNER = os.environ.get("GITHUB_REPOSITORY_OWNER", "Kedreamix")
 REPO = os.environ.get("GITHUB_REPOSITORY", f"{OWNER}/mimotion").split("/")[-1]
 TOKEN = os.environ.get("GITHUB_TOKEN", "")
 OUT = Path(os.environ.get("PAGES_DATA_PATH", "docs/data.json"))
 API = f"https://api.github.com/repos/{OWNER}/{REPO}"
+
+
+def public_params() -> dict:
+    params = {}
+    blob = (os.environ.get("REPO_VARS") or "").strip()
+    if blob:
+        try:
+            parsed = json.loads(blob)
+            if isinstance(parsed, dict):
+                skip = {"CONFIG", "PAT", "AES_KEY", "GITHUB_TOKEN", "REPO_VARS", "USER", "PWD"}
+                skip.update(item.get("key") for item in load_schema().get("secretConfig") or [] if item.get("key"))
+                params.update({
+                    str(k): "" if v is None else str(v)
+                    for k, v in parsed.items()
+                    if k not in skip
+                })
+        except json.JSONDecodeError:
+            pass
+    for key in runtime_keys():
+        if os.environ.get(key):
+            params[key] = os.environ.get(key)
+        else:
+            params.setdefault(key, "")
+    for item in load_schema().get("tunable") or []:
+        name = item.get("variable")
+        if name:
+            params[name] = os.environ.get(name) or params.get(name) or ""
+    return params
 
 
 def fetch(url: str) -> dict:
@@ -33,6 +66,7 @@ def main() -> None:
         "repo": f"{OWNER}/{REPO}",
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cronText": cron_text,
+        "params": public_params(),
         "runs": [
             {
                 "name": item.get("name"),

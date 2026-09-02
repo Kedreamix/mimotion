@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#07090d" />
+  <title>mimotion 参数</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <h1>参数</h1>
+        <p>常改项写入仓库变量，账号密码仍放 Secret</p>
+      </div>
+    </div>
+    <div class="top-meta">
+      <nav class="nav">
+        <a href="./">看板</a>
+        <a href="./settings.html" class="active">参数</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>怎么存</h2>
+      </div>
+      <p class="muted">不要把密码写进公开页面。后续加新旋钮：先改 <code>docs/params.json</code>，再在 <code>run.yml</code> 里加一行 <code>vars.新参数</code>。仓库变量会覆盖 CONFIG 里的同名字段。</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>常用参数</h2>
+        <span class="muted">写入 GitHub Variables</span>
+      </div>
+      <form id="tunable-form" class="form-grid"></form>
+      <div class="actions">
+        <button id="save-vars" class="primary" type="button">写入仓库变量</button>
+        <button id="copy-vars" type="button">复制变量清单</button>
+        <a id="vars-link" href="#" target="_blank" rel="noreferrer">打开 Variables</a>
+        <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>写入凭证</h2>
+      </div>
+      <p class="muted">PAT 只存在这个浏览器，不会上传到仓库。需要 Fine-grained 权限：<code>Variables</code> 读写。不填 PAT 时，请复制清单到仓库变量页，或跑「更新参数」工作流。</p>
+      <label class="field">PAT
+        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
+      </label>
+      <div class="actions">
+        <button id="save-pat" type="button">保存在本机</button>
+        <button id="clear-pat" type="button">清除</button>
+        <button id="load-vars" type="button">读取当前变量</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>账号与推送</h2>
+        <span class="muted">生成 CONFIG Secret，不自动提交</span>
+      </div>
+      <form id="secret-form" class="form-grid"></form>
+      <div class="actions">
+        <button id="copy-config" class="primary" type="button">复制 CONFIG JSON</button>
+        <a id="secrets-link" href="#" target="_blank" rel="noreferrer">打开 Secrets</a>
+      </div>
+      <pre id="config-preview" class="json"></pre>
+    </section>
+
+    <p id="status" class="banner" hidden></p>
+  </main>
+  <footer>
+    <p>变量覆盖 CONFIG。改 <code>CRON_HOURS</code> 后，下次刷步成功或手动跑 Random Cron 才会换上新整点。</p>
+  </footer>
+  <script src="./settings.js"></script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 (() => {
   const DEFAULT = { owner: "Kedreamix", repo: "mimotion" };
   const RING = 2 * Math.PI * 92;
-  const STEP_GOAL = 25000;
+  const DEFAULT_STEP_GOAL = 25000;
+  let stepGoal = DEFAULT_STEP_GOAL;
 
   const $ = (id) => document.getElementById(id);
 
@@ -64,6 +65,21 @@
     };
   }
 
+  function unionHours(...lists) {
+    const set = new Set();
+    lists.forEach((list) => {
+      (list || []).forEach((n) => {
+        if (Number.isFinite(n)) set.add(Number(n));
+      });
+    });
+    return [...set].sort((a, b) => a - b);
+  }
+
+  function applyParams(params) {
+    const n = Number(params && params.MAX_STEP);
+    if (Number.isFinite(n) && n > 0) stepGoal = n;
+  }
+
   function parseCronFile(text) {
     const [meta, stateRaw] = String(text || "").split("---STEP_STATE---");
     const sync = (meta.match(/北京时间:\s*([\d-]+ [\d:]+)/) || [])[1] || "";
@@ -82,7 +98,7 @@
       lastSyncText: sync,
       nextHour: nextExec ? Number(nextExec[1]) : null,
       nextMinute: nextExec ? Number(nextExec[2]) : (next.minute || current.minute || 0),
-      hours: (next.hours.length ? next.hours : current.hours),
+      hours: unionHours(current.hours, next.hours),
       minute: next.minute || current.minute || 0,
       lastStep: Number(last.last_step || 0),
       lastStepDate: last.last_step_date || "",
@@ -91,7 +107,7 @@
   }
 
   function setRing(step) {
-    const ratio = Math.max(0, Math.min(1, step / STEP_GOAL));
+    const ratio = Math.max(0, Math.min(1, step / stepGoal));
     $("ring-value").style.strokeDasharray = String(RING);
     $("ring-value").style.strokeDashoffset = String(RING * (1 - ratio));
   }
@@ -117,7 +133,7 @@
 
     $("last-step").textContent = cron.lastStep ? cron.lastStep.toLocaleString("zh-CN") : "—";
     $("step-date").textContent = cron.lastStepDate
-      ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${STEP_GOAL.toLocaleString("zh-CN")}`
+      ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${stepGoal.toLocaleString("zh-CN")}`
       : "暂无步数记录";
     setRing(cron.lastStep || 0);
 
@@ -242,6 +258,7 @@
     $("refresh").disabled = true;
     try {
       const snapshot = await loadSnapshot();
+      if (snapshot && snapshot.params) applyParams(snapshot.params);
       let data = snapshot;
       let usedSnapshot = false;
       try {
