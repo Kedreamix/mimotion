@@ -311,8 +311,7 @@ button.primary {
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  margin: 12px auto 24px;
-  width: min(1040px, calc(100% - 32px));
+  margin: 0 0 16px;
 }
 .banner.ok { border-color: rgba(61, 214, 140, 0.4); }
 .banner.bad { border-color: rgba(255, 93, 115, 0.4); }
