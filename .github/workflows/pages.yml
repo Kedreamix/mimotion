@@ -39,7 +39,10 @@ jobs:
         run: python3 .github/scripts/build_pages_data.py
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+          token: ${{ secrets.PAT }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

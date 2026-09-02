@@ -217,7 +217,8 @@
 
 - 访问地址：`https://<你的GitHub用户名>.github.io/mimotion/`
 - 本仓库示例：[https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)
-- 合并后由 `.github/workflows/pages.yml` 自动发布。第一次如果打不开，到 `Settings → Pages` 把 Source 选成 `GitHub Actions` 即可。
+- 由 `.github/workflows/pages.yml` 自动发布。第一次会用 `PAT` 尝试自动开通 Pages（`configure-pages` 的 `enablement` 需要 PAT，不能用默认 `GITHUB_TOKEN`）。
+- 如果仍然报 `Get Pages site failed` / 404：到 `Settings → Pages` 把 Source 选成 `GitHub Actions`，或给 PAT 加上 `Pages` 写权限后再手动跑一次该工作流。
 
 ### 查看执行记录
 
