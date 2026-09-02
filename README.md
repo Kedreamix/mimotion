@@ -4,6 +4,7 @@
 [![GitHub forks](https://img.shields.io/github/forks/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/forks)
 [![GitHub stars](https://img.shields.io/github/stars/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/issues)
+[![GitHub Pages](https://img.shields.io/badge/Pages-状态看板-ff5a1f)](https://kedreamix.github.io/mimotion/)
 
 ## 小米运动自动刷步数（支持邮箱登录）
 
@@ -209,6 +210,14 @@
 9. cron的执行根据github actions的资源进行排队，并不是百分百按指定的时间进行运行，请知悉。
 
 10. 新版本接口有限制，同ip登录过多账号可能会429，请自行测试。
+
+### 状态看板（GitHub Pages）
+
+仓库带了一个简单的状态页，用来看最近刷步是否成功、当前步数、下次定时，以及最近的 Actions 记录。页面只读公开数据，不会展示密码或 Secret。
+
+- 访问地址：`https://<你的GitHub用户名>.github.io/mimotion/`
+- 本仓库示例：[https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)
+- 合并后由 `.github/workflows/pages.yml` 自动发布。第一次如果打不开，到 `Settings → Pages` 把 Source 选成 `GitHub Actions` 即可。
 
 ### 查看执行记录
 
