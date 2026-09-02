@@ -1,7 +1,14 @@
 # -*- coding: utf8 -*-
 import unittest
 
-from util.params import bj_hours_to_utc, overlay_config, runtime_keys, utc_hours_to_bj
+from util.params import (
+    bj_hours_to_utc,
+    collect_public_params,
+    overlay_config,
+    public_param_names,
+    runtime_keys,
+    utc_hours_to_bj,
+)
 
 
 class ParamsTest(unittest.TestCase):
@@ -23,15 +30,29 @@ class ParamsTest(unittest.TestCase):
         self.assertEqual(merged["USER"], "a")
         self.assertEqual(applied, ["MIN_STEP", "SLEEP_GAP"])
 
-    def test_repo_vars_json_adds_future_keys(self):
+    def test_repo_vars_json_ignores_unlisted_keys(self):
         config = {"MIN_STEP": "18000"}
         merged, applied = overlay_config(config, {
-            "REPO_VARS": '{"MIN_STEP":"10000","NEW_FLAG":"1"}',
+            "REPO_VARS": '{"MIN_STEP":"10000","NEW_FLAG":"1","PAT":"secret"}',
             "MIN_STEP": "12000",
         })
         self.assertEqual(merged["MIN_STEP"], "12000")
-        self.assertEqual(merged["NEW_FLAG"], "1")
-        self.assertEqual(applied, ["MIN_STEP", "NEW_FLAG"])
+        self.assertNotIn("NEW_FLAG", merged)
+        self.assertNotIn("PAT", merged)
+        self.assertEqual(applied, ["MIN_STEP"])
+
+    def test_collect_public_params_whitelist(self):
+        params = collect_public_params({
+            "REPO_VARS": '{"MIN_STEP":"1","NEW_FLAG":"leak","PAT":"nope","CRON_HOURS":"0,8"}',
+            "MAX_STEP": "9",
+        })
+        self.assertEqual(params["MIN_STEP"], "1")
+        self.assertEqual(params["MAX_STEP"], "9")
+        self.assertEqual(params["CRON_HOURS"], "0,8")
+        self.assertNotIn("NEW_FLAG", params)
+        self.assertNotIn("PAT", params)
+        self.assertNotIn("CRON_HOURS_BJ", params)
+        self.assertEqual(public_param_names(), set(params))
 
     def test_hour_wraparound(self):
         self.assertEqual(bj_hours_to_utc("0,8"), "0,16")

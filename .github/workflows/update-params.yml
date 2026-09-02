@@ -41,6 +41,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: 写入仓库 Variables
+        id: write-vars
         env:
           GH_TOKEN: ${{ secrets.PAT }}
           MIN_STEP: ${{ inputs.min_step }}
@@ -58,6 +59,6 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
           gh workflow run pages.yml --ref master || true
-          if [ -n "${{ inputs.cron_hours_bj }}" ]; then
+          if [ "${{ steps.write-vars.outputs.apply_cron }}" = "true" ]; then
             gh workflow run cron.yml --ref master || true
           fi

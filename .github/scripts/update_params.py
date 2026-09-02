@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from util.params import bj_hours_to_utc, load_schema
+from util.params import collect_variable_updates
 
 
 def set_var(name: str, value: str) -> None:
@@ -24,6 +24,14 @@ def set_var(name: str, value: str) -> None:
     print(f"updated {name}")
 
 
+def write_output(name: str, value: str) -> None:
+    path = os.environ.get("GITHUB_OUTPUT")
+    if not path:
+        return
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(f"{name}={value}\n")
+
+
 def main() -> None:
     if not os.environ.get("GH_TOKEN") and not os.environ.get("GITHUB_TOKEN"):
         raise SystemExit("缺少 PAT，无法写入仓库变量")
@@ -34,26 +42,13 @@ def main() -> None:
         if not isinstance(extra, dict):
             raise SystemExit("PARAMS_JSON 必须是对象")
 
-    for item in load_schema().get("tunable") or []:
-        key = item.get("key")
-        if not key:
-            continue
-        value = os.environ.get(key)
-        if value is None or str(value).strip() == "":
-            if key in extra:
-                value = extra.get(key)
-            elif item.get("variable") in extra:
-                value = extra.get(item.get("variable"))
-            else:
-                value = ""
-        value = "" if value is None else str(value).strip()
-        if item.get("type") == "bj-hours":
-            if value:
-                target = item.get("variable") or "CRON_HOURS"
-                set_var(target, bj_hours_to_utc(value))
-                print(f"{target} from BJ {value}")
-            continue
-        set_var(key, value)
+    updates, apply_cron = collect_variable_updates(os.environ, extra)
+    for name, value in updates:
+        set_var(name, value)
+        if name == "CRON_HOURS":
+            print(f"{name} updated to {value}")
+            apply_cron = True
+    write_output("apply_cron", "true" if apply_cron else "false")
 
 
 if __name__ == "__main__":

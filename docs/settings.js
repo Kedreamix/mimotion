@@ -54,7 +54,9 @@
 
   function fieldInput(item) {
     if (item.type === "select") {
-      const opts = (item.options || []).map((opt) => `<option value="${opt}">${opt}</option>`).join("");
+      const opts = [`<option value="">（沿用当前）</option>`]
+        .concat((item.options || []).map((opt) => `<option value="${opt}">${opt}</option>`))
+        .join("");
       return `<select name="${item.key}">${opts}</select>`;
     }
     if (item.type === "bj-hours") {
@@ -64,7 +66,8 @@
       return `<input type="hidden" name="${item.key}" /><div class="hours" data-for="${item.key}">${chips}</div>`;
     }
     const type = item.type === "password" ? "password" : (item.type === "number" ? "number" : "text");
-    return `<input name="${item.key}" type="${type}" value="${item.default || ""}" />`;
+    const placeholder = item.default ? ` placeholder="${item.default}"` : "";
+    return `<input name="${item.key}" type="${type}"${placeholder} />`;
   }
 
   function renderForms(schema) {
@@ -80,13 +83,6 @@
         <span class="muted">${item.help || ""}</span>
       </label>
     `).join("");
-    (schema.tunable || []).forEach((item) => {
-      if (item.type === "bj-hours") setHours(item.key, parseHours(item.default));
-      else if (item.default != null) {
-        const input = $("tunable-form").elements[item.key];
-        if (input) input.value = item.default;
-      }
-    });
     $("tunable-form").addEventListener("click", (event) => {
       const chip = event.target.closest(".chip");
       if (!chip) return;
@@ -94,7 +90,14 @@
       const wrap = chip.parentElement;
       const selected = [...wrap.querySelectorAll(".chip.on")].map((el) => Number(el.dataset.hour));
       $("tunable-form").elements[wrap.dataset.for].value = selected.sort((a, b) => a - b).join(",");
+      markDirty(wrap.dataset.for);
       refreshCronPreview();
+    });
+    $("tunable-form").addEventListener("input", (event) => {
+      if (event.target && event.target.name) markDirty(event.target.name);
+    });
+    $("tunable-form").addEventListener("change", (event) => {
+      if (event.target && event.target.name) markDirty(event.target.name);
     });
     updateConfigPreview();
     refreshCronPreview();
@@ -130,13 +133,19 @@
     $("tunable-form").elements[key].value = hours.join(",");
   }
 
+  const dirty = new Set();
+
+  function markDirty(key) {
+    if (key) dirty.add(key);
+  }
+
   function collectTunable(schema) {
     const pairs = [];
     for (const item of schema.tunable || []) {
       const raw = ($("tunable-form").elements[item.key] || {}).value || "";
       const name = item.variable || item.key;
       const value = item.type === "bj-hours" ? bjToUtc(parseHours(raw)).join(",") : String(raw).trim();
-      pairs.push({ name, value, label: item.label, raw });
+      pairs.push({ key: item.key, name, value, label: item.label, raw });
     }
     return pairs;
   }
@@ -189,14 +198,25 @@
         if (input) input.value = map[item.key];
       }
     }
+    dirty.clear();
   }
 
   let schemaCache = { tunable: [], secretConfig: [] };
 
   $("pat").value = localStorage.getItem(PAT_KEY) || "";
-  $("save-pat").addEventListener("click", () => {
-    localStorage.setItem(PAT_KEY, $("pat").value.trim());
-    showStatus("PAT 已保存在这个浏览器。", true);
+  $("save-pat").addEventListener("click", async () => {
+    const token = $("pat").value.trim();
+    localStorage.setItem(PAT_KEY, token);
+    if (!token) {
+      showStatus("PAT 已保存在这个浏览器。", true);
+      return;
+    }
+    try {
+      await loadVariables(token, schemaCache);
+      showStatus("PAT 已保存，并填入仓库当前变量。只会写入你改过的项。", true);
+    } catch (err) {
+      showStatus("PAT 已保存。读取当前变量失败：" + String(err.message || err), false);
+    }
   });
   $("clear-pat").addEventListener("click", () => {
     localStorage.removeItem(PAT_KEY);
@@ -205,11 +225,18 @@
   });
 
   $("copy-vars").addEventListener("click", async () => {
-    const lines = collectTunable(schemaCache)
-      .map((item) => `${item.name}=${item.value}`)
-      .join("\n");
+    const all = collectTunable(schemaCache);
+    const selected = dirty.size
+      ? all.filter((item) => dirty.has(item.key) && item.value !== "")
+      : all.filter((item) => item.value !== "");
+    const lines = selected.map((item) => `${item.name}=${item.value}`).join("\n");
     await navigator.clipboard.writeText(lines);
-    showStatus("已复制变量清单。可粘贴到仓库 Variables，或对照填写。", true);
+    showStatus(
+      dirty.size
+        ? "已复制你改过的变量。可粘贴到仓库 Variables。"
+        : "已复制当前表单里的非空变量。未读取仓库时不会带上默认值。",
+      true,
+    );
   });
 
   $("copy-config").addEventListener("click", async () => {
@@ -227,7 +254,11 @@
     }
     try {
       const pairs = await persistTunable(token);
-      showStatus(`已写入 ${pairs.map((item) => item.name).join(", ") || "无变更"}。改定时后请点「应用新定时」，或等下次刷步成功。`, true);
+      if (!pairs.length) {
+        showStatus("没有改动过的参数。请先修改，或点「读取当前变量」后再改。", false);
+        return;
+      }
+      showStatus(`已写入 ${pairs.map((item) => item.name).join(", ")}。改定时后请点「应用新定时」，或等下次刷步成功。`, true);
     } catch (err) {
       showStatus(String(err.message || err) + "。PAT 需要 Variables 读写权限。", false);
     }
@@ -235,8 +266,9 @@
 
   async function persistTunable(token) {
     const api = window.MimoApi;
-    const pairs = collectTunable(schemaCache).filter((item) => item.value !== "");
+    const pairs = collectTunable(schemaCache).filter((item) => dirty.has(item.key) && item.value !== "");
     for (const item of pairs) await api.setVariable(token, item.name, item.value);
+    pairs.forEach((item) => dirty.delete(item.key));
     return pairs;
   }
 
@@ -270,13 +302,18 @@
     const token = tokenOrHint("保存并刷步");
     if (!token) return;
     try {
-      await persistTunable(token);
+      const pairs = await persistTunable(token);
       const form = $("tunable-form").elements;
       const inputs = {};
       if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
       if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
       await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
-      showStatus("已保存参数并触发马上刷步。", true);
+      showStatus(
+        pairs.length
+          ? `已保存 ${pairs.map((item) => item.name).join(", ")} 并触发马上刷步。`
+          : "没有改动过的仓库变量，已按当前表单触发马上刷步。",
+        true,
+      );
     } catch (err) {
       showStatus(String(err.message || err), false);
     }
@@ -320,9 +357,17 @@
 
   fetch("./params.json")
     .then((res) => res.json())
-    .then((schema) => {
+    .then(async (schema) => {
       schemaCache = schema;
       renderForms(schema);
+      const token = $("pat").value.trim() || localStorage.getItem(PAT_KEY) || "";
+      if (!token) return;
+      try {
+        await loadVariables(token, schema);
+        showStatus("已自动填入仓库当前变量。只会写入你改过的项。", true);
+      } catch (err) {
+        showStatus("表单已打开，读取当前变量失败：" + String(err.message || err), false);
+      }
     })
     .catch((err) => showStatus("无法读取 params.json：" + err, false));
 })();
