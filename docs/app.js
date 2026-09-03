@@ -90,9 +90,6 @@
       ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${stepGoal.toLocaleString("zh-CN")}`
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
-    $("account-ready").textContent = cron.accountCount
-      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。这里输入站长密码可立刻刷一次。`
-      : "输入站长密码即可立刻刷一次，不用 GitHub。";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -297,6 +294,37 @@
     if (event.key === "Enter") runOwner();
   });
 
+  async function checkOwnerSetup() {
+    const ready = $("account-ready");
+    const setup = $("owner-setup");
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) {
+      ready.textContent = "刷步接口还没部署。";
+      if (setup) setup.open = true;
+      return;
+    }
+    try {
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-status`);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `status ${res.status}`);
+      if (body.configured) {
+        ready.textContent = "输入站长密码，验证成功后立即开刷";
+        return;
+      }
+      if (!body.hasPassword) {
+        ready.textContent = "还没设置站长密码，先去 Cloudflare Worker 添加密钥";
+      } else if (!body.hasAccount) {
+        ready.textContent = "密码已设，还缺 Zepp 账号密钥 OWNER_USER / OWNER_PWD";
+      } else {
+        ready.textContent = "站长刷步还没配置完成";
+      }
+      if (setup) setup.open = true;
+    } catch {
+      ready.textContent = "刷步接口连不上。先部署 Worker，再设置 OWNER_PASSWORD";
+      if (setup) setup.open = true;
+    }
+  }
+
   function showGuest(text, ok) {
     const el = $("guest-status");
     el.hidden = false;
@@ -344,5 +372,6 @@
     }
   });
 
+  checkOwnerSetup();
   refresh();
 })();

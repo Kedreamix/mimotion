@@ -253,6 +253,7 @@
 - 游客密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
 - 按 IP 限流（10 分钟 5 次）。
 - 本地验证：`OWNER_PASSWORD=demo OWNER_USER=13800138000 OWNER_PWD=secret node worker/dev-server.mjs`
+- **不要**把 `OWNER_PASSWORD` 写成 GitHub Variables / `params.json`。公开仓库里谁都能看到。
 - 上线：
 
 ```bash
@@ -262,7 +263,7 @@ npx wrangler secret put OWNER_USER
 npx wrangler secret put OWNER_PWD
 ```
 
-若 wrangler 打印的不是 `https://mimotion-guest.kedreamix.workers.dev`，把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`。
+若 wrangler 打印的不是 `https://mimotion.kedreamix.workers.dev`，把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`。
 - 允许的来源按看板地址匹配：`https://kedreamix.github.io/mimotion/`（浏览器 Origin 不含路径，Worker 会按站点 origin 放行）。
 - Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
 
