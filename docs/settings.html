@@ -45,6 +45,44 @@
       </article>
     </section>
 
+    <section class="panel setup-card" id="owner-password">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">OWNER PASSWORD</p>
+          <h2>站长密码怎么设</h2>
+        </div>
+        <span class="muted">Cloudflare Secret</span>
+      </div>
+      <div class="setup-warn">
+        <strong>不要写成 GitHub 参数</strong>
+        <p>不要写到仓库 Variables、<code>params.json</code> 或这个页面。公开仓库里谁都能看到。密码只放 Cloudflare Worker 的 Secret。</p>
+      </div>
+      <ol class="setup-steps">
+        <li>
+          <strong>部署 Worker</strong>
+          <p>在仓库 <code>worker/</code> 目录执行 <code>npx wrangler login</code>，再执行 <code>npx wrangler deploy</code>。</p>
+        </li>
+        <li>
+          <strong>添加三个密钥</strong>
+          <p>打开 <a href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare 控制台</a> → Workers &amp; Pages → <code>mimotion-guest</code> → Settings → Variables and Secrets，添加：</p>
+          <ul>
+            <li><code>OWNER_PASSWORD</code> — 看板上输入的站长密码，你自己定</li>
+            <li><code>OWNER_USER</code> — 你的 Zepp Life 账号</li>
+            <li><code>OWNER_PWD</code> — 你的 Zepp Life 密码</li>
+          </ul>
+          <p>命令行也可以：<code>npx wrangler secret put OWNER_PASSWORD</code>，另外两个同理。</p>
+        </li>
+        <li>
+          <strong>回看板刷步</strong>
+          <p>打开看板，输入刚才设的 <code>OWNER_PASSWORD</code>，点马上刷步。不用 GitHub PAT。</p>
+        </li>
+      </ol>
+      <div class="actions">
+        <a class="button-link" href="./#owner">去看板用密码刷步</a>
+        <a class="button-link" href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">打开 Cloudflare</a>
+      </div>
+    </section>
+
     <details class="auth-card">
       <summary>
         <span><i class="auth-dot"></i>连接 GitHub</span>
