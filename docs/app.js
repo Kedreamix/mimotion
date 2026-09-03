@@ -99,6 +99,9 @@
       ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${stepGoal.toLocaleString("zh-CN")}`
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
+    $("account-ready").textContent = cron.accountCount
+      ? `使用仓库中已保存的 ${cron.accountCount} 个账号`
+      : "使用仓库中已保存的账号与密码";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";

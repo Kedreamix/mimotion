@@ -15,8 +15,8 @@
     <div class="brand">
       <span class="logo" aria-hidden="true"></span>
       <div>
-        <h1>参数</h1>
-        <p>Variables 与 Secret 分开</p>
+        <h1>控制台</h1>
+        <p>只把常用操作放在前面</p>
       </div>
     </div>
     <nav class="nav">
@@ -28,46 +28,83 @@
   <main>
     <p id="status" class="banner" hidden></p>
 
-    <section class="panel slim">
-      <label class="field">PAT（只存在本机）
-        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
-      </label>
-      <div class="actions">
-        <button id="save-pat" type="button">保存</button>
-        <button id="clear-pat" type="button">清除</button>
-        <button id="load-vars" type="button">读取当前变量</button>
-      </div>
+    <section class="capabilities" aria-label="页面能力">
+      <article class="capability can">
+        <span class="cap-icon" aria-hidden="true">↗</span>
+        <div>
+          <strong>可以直接操作</strong>
+          <p>步数范围、执行整点、马上刷步</p>
+        </div>
+      </article>
+      <article class="capability locked">
+        <span class="cap-icon" aria-hidden="true">◇</span>
+        <div>
+          <strong>需要 GitHub Secret</strong>
+          <p>账号、密码和推送凭证不能从公开页面直接提交</p>
+        </div>
+      </article>
     </section>
 
-    <section class="panel">
+    <details class="auth-card">
+      <summary>
+        <span><i class="auth-dot"></i>连接 GitHub</span>
+        <small>PAT 只保存在这个浏览器</small>
+      </summary>
+      <div class="auth-content">
+        <label class="field">Personal Access Token
+          <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
+        </label>
+        <div class="actions">
+          <button id="save-pat" type="button">保存并读取</button>
+          <button id="clear-pat" type="button">清除</button>
+          <button id="load-vars" type="button">读取当前变量</button>
+        </div>
+      </div>
+    </details>
+
+    <section class="panel settings-panel">
       <div class="panel-head">
-        <h2>常用参数</h2>
-        <span class="muted">空着不改，只写入你改过的项</span>
+        <div>
+          <p class="eyebrow">DAILY</p>
+          <h2>日常设置</h2>
+        </div>
+        <span class="muted">空着不改</span>
       </div>
       <form id="tunable-form" class="form-grid"></form>
-      <div class="actions">
-        <button id="save-vars" class="primary" type="button">保存变量</button>
-        <button id="save-and-run" type="button">保存并刷步</button>
-        <button id="run-now" type="button">马上刷步</button>
-        <button id="copy-vars" type="button">复制清单</button>
+      <div class="actions sticky-actions">
+        <button id="save-vars" class="primary" type="button">保存设置</button>
+        <button id="save-and-run" type="button">保存并马上刷步</button>
+        <button id="run-now" class="ghost" type="button">只马上刷步</button>
       </div>
+      <p class="action-note">马上刷步使用仓库里已经保存的账号和密码，不会使用下面尚未写入 Secret 的内容。</p>
     </section>
 
-    <details class="panel more-panel">
-      <summary>账号 CONFIG（Secret，不自动提交）</summary>
-      <form id="secret-form" class="form-grid"></form>
-      <div class="actions">
-        <button id="copy-config" class="primary" type="button">复制 CONFIG JSON</button>
-        <a id="secrets-link" href="#" target="_blank" rel="noreferrer">打开 Secrets</a>
+    <details class="panel more-panel protected-panel">
+      <summary>
+        <span>账号与密码</span>
+        <small>受保护 · CONFIG Secret</small>
+      </summary>
+      <div class="protected-note">
+        <strong>不能在这里直接验证账号密码</strong>
+        <p>公开 Pages 不应把密码作为工作流输入。请在这里生成 CONFIG，复制后到 GitHub Secrets 更新，再回来看板点「马上刷步」验证。</p>
       </div>
+      <form id="secret-form" class="form-grid secret-grid"></form>
       <pre id="config-preview" class="json"></pre>
+      <div class="actions">
+        <button id="copy-config" class="primary" type="button">复制 CONFIG</button>
+        <a id="secrets-link" class="button-link" href="#" target="_blank" rel="noreferrer">去 Secrets 更新</a>
+      </div>
     </details>
 
     <details class="panel more-panel">
-      <summary>其它工作流</summary>
+      <summary>
+        <span>工具与手动入口</span>
+        <small>不常用</small>
+      </summary>
       <div class="actions">
         <button id="apply-cron" type="button">应用新定时</button>
         <button id="refresh-pages" type="button">刷新看板</button>
+        <button id="copy-vars" type="button">复制变量清单</button>
         <a id="vars-link" href="#" target="_blank" rel="noreferrer">Variables</a>
         <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
         <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 刷步</a>

@@ -71,12 +71,24 @@
   }
 
   function renderForms(schema) {
-    $("tunable-form").innerHTML = (schema.tunable || []).map((item) => `
+    const dailyKeys = new Set(["MIN_STEP", "MAX_STEP", "CRON_HOURS_BJ"]);
+    const daily = (schema.tunable || []).filter((item) => dailyKeys.has(item.key));
+    const advanced = (schema.tunable || []).filter((item) => !dailyKeys.has(item.key));
+    const renderFields = (items) => items.map((item) => `
       <label class="field">${item.label}
         ${fieldInput(item)}
         <span class="muted">${item.help || ""}</span>
       </label>
     `).join("");
+    $("tunable-form").innerHTML = `
+      <div class="daily-grid">${renderFields(daily)}</div>
+      ${advanced.length ? `
+        <details class="inline-details">
+          <summary><span>高级参数</span><small>间隔、多线程、推送</small></summary>
+          <div class="advanced-grid">${renderFields(advanced)}</div>
+        </details>
+      ` : ""}
+    `;
     $("secret-form").innerHTML = (schema.secretConfig || []).map((item) => `
       <label class="field">${item.label}
         ${fieldInput(item)}

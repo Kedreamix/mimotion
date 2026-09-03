@@ -65,14 +65,19 @@
       <ol class="hour-row" id="timeline"></ol>
     </section>
 
-    <section class="panel slim">
+    <section class="panel action-card">
+      <div class="action-copy">
+        <p class="eyebrow">QUICK ACTION</p>
+        <h2>立即执行一次</h2>
+        <p id="account-ready" class="muted">使用仓库中已保存的账号</p>
+      </div>
       <div class="quick-row">
-        <button id="run-now" class="primary" type="button">马上刷步</button>
-        <a href="./settings.html">改参数</a>
+        <button id="run-now" class="primary run-button" type="button">马上刷步 <span>→</span></button>
+        <a href="./settings.html">设置</a>
       </div>
       <p id="ops-status" class="banner" hidden></p>
       <details class="more">
-        <summary>本次范围与 PAT</summary>
+        <summary>本次范围与 GitHub PAT</summary>
         <div class="ops-grid">
           <label class="field">最小步数
             <input id="op-min" type="number" min="1" step="1" placeholder="沿用仓库" />
