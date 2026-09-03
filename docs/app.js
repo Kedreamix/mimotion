@@ -259,15 +259,12 @@
       return;
     }
     const endpoint = window.MIMO_GUEST_API;
-    if (!endpoint) {
-      showOps("刷步接口还没部署。", false);
-      return;
-    }
     const button = $("run-now");
     button.disabled = true;
     button.innerHTML = "正在刷步…";
     showOps("正在验证密码，通过后触发 GitHub Actions 刷步…", true);
     try {
+      if (!endpoint) throw new Error("刷步接口还没部署，请先配置 Cloudflare Worker。");
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-run`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -282,7 +279,10 @@
       showOps(body.message || `已同步 ${body.step} 步`, true);
     } catch (err) {
       $("owner-pwd").value = "";
-      showOps(String(err.message || err), false);
+      const msg = String(err.message || err);
+      showOps(msg.includes("Failed to fetch") || msg.includes("Load failed")
+        ? "刷步接口暂不可用，请确认 Cloudflare Worker 已部署并配置 OWNER_PASSWORD 和 OWNER_GITHUB_PAT。"
+        : msg, false);
     } finally {
       button.disabled = false;
       button.innerHTML = "马上刷步 <span>→</span>";
@@ -356,7 +356,10 @@
       showGuest(body.message || `已同步 ${body.step} 步`, true);
     } catch (err) {
       $("guest-pwd").value = "";
-      showGuest(String(err.message || err) + "。如果是本地预览，请先启动 worker/dev-server.mjs。", false);
+      const msg = String(err.message || err);
+      showGuest(msg.includes("Failed to fetch") || msg.includes("Load failed")
+        ? "游客刷步接口暂不可用，可能还没部署 Cloudflare Worker。"
+        : msg, false);
     } finally {
       $("guest-run").disabled = false;
     }
