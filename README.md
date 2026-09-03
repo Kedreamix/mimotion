@@ -215,7 +215,9 @@
 
 ### 状态看板（GitHub Pages）
 
-仓库带了一个简单的状态页，用来看最近刷步是否成功、当前步数、下次定时，以及最近的 Actions 记录。页面只读公开数据，不会展示密码或 Secret。
+仓库带了一个简单的状态页，用来看最近刷步是否成功、当前步数、下一次定时，以及最近的刷步记录。页面只读公开数据，不会展示密码或 Secret。
+
+「下次定时」只表示 **当前 `run.yml` 里已经写死的那一次**（对应 `cron_change_time` 里的 `next cron`）。刷步成功后 Random Cron 会重随分钟，所以时间轴只标整点，不会把同一个随机分钟套到全天。
 
 - 访问地址：`https://<你的GitHub用户名>.github.io/mimotion/`
 - 参数页：`https://<你的GitHub用户名>.github.io/mimotion/settings.html`
@@ -231,23 +233,22 @@
 | Secret `CONFIG` | `USER` `PWD` 以及各类推送 Token | 参数页复制 JSON，粘贴到 Secrets；或按步骤八导出后再改 |
 | 仓库 Variables | `MIN_STEP` `MAX_STEP` `CRON_HOURS` `SLEEP_GAP` `USE_CONCURRENT` `PUSH_PLUS_HOUR` `PUSH_PLUS_MAX` | 参数页写入，或 Actions 工作流「更新参数」 |
 
-`main.py` 会把 Variables 覆盖到 CONFIG 的同名键上：Variables 为空则继续用 CONFIG。看板圆环目标读快照里的 `MAX_STEP`。
+`main.py` 会把 Variables 覆盖到 CONFIG 的同名键上：Variables 为空则继续用 CONFIG。看板目标步数读快照里的 `MAX_STEP`。
 
 参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
 
 三种改 Variables 的方式：
 
-1. 打开参数页或看板的「马上操作」，可选填 PAT（只存在本机）。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
+1. 打开参数页，可选填 PAT（只存在本机）。看板也可以展开「本次范围与 PAT」后马上刷步。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
 2. 不想把 PAT 放浏览器：到 Actions 手动跑 `刷步数` / `更新参数`，它们使用仓库里的 `secrets.PAT`。
 3. 直接打开 [仓库 Variables](../../settings/variables/actions) 手工填写。`CRON_HOURS` 这里必须填 UTC。
 
 看板和参数页还接了这些接口：
 
-- **马上刷步**：触发 `刷步数` 工作流。可带上这一次的最小/最大步数，不改默认值。
-- **保存步数范围**：把最小/最大写入 Variables，之后定时任务也用这组值。
-- **保存并刷步**：先保存再立刻跑一次。
-- **应用新定时**：触发 `Random Cron`，按 `CRON_HOURS` 换上下一次整点。
-- **刷新看板**：重新发布 GitHub Pages 快照。
+- **马上刷步**：看板和参数页都可以触发 `刷步数`。可带上这一次的最小/最大步数，不改默认值。
+- **保存变量 / 保存并刷步**：在参数页写入 Variables。
+- **应用新定时**：参数页「其它工作流」，触发 `Random Cron`。
+- **刷新看板**：参数页「其它工作流」，重新发布 GitHub Pages 快照。
 
 没有接「提取配置信息」：那会把密码推到聊天里，不适合放在公开页面上。
 

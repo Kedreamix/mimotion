@@ -16,29 +16,24 @@
       <span class="logo" aria-hidden="true"></span>
       <div>
         <h1>参数</h1>
-        <p>常改项写入仓库变量，账号密码仍放 Secret</p>
+        <p>Variables 与 Secret 分开</p>
       </div>
     </div>
-    <div class="top-meta">
-      <nav class="nav">
-        <a href="./">看板</a>
-        <a href="./settings.html" class="active">参数</a>
-      </nav>
-    </div>
+    <nav class="nav">
+      <a href="./">看板</a>
+      <a href="./settings.html" class="active">参数</a>
+    </nav>
   </header>
 
   <main>
     <p id="status" class="banner" hidden></p>
-    <section class="panel">
-      <div class="panel-head">
-        <h2>写入凭证</h2>
-      </div>
-      <p class="muted">PAT 只存在这个浏览器。马上刷步需要 <code>Actions</code> 读写，保存步数需要 <code>Variables</code> 读写。不填也可以去 Actions 手动跑。</p>
-      <label class="field">PAT
+
+    <section class="panel slim">
+      <label class="field">PAT（只存在本机）
         <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
       </label>
       <div class="actions">
-        <button id="save-pat" type="button">保存在本机</button>
+        <button id="save-pat" type="button">保存</button>
         <button id="clear-pat" type="button">清除</button>
         <button id="load-vars" type="button">读取当前变量</button>
       </div>
@@ -47,48 +42,38 @@
     <section class="panel">
       <div class="panel-head">
         <h2>常用参数</h2>
-        <span class="muted">空着表示不改。只会写入你改过的项，不会用默认值覆盖仓库里的其它变量</span>
+        <span class="muted">空着不改，只写入你改过的项</span>
       </div>
       <form id="tunable-form" class="form-grid"></form>
       <div class="actions">
-        <button id="save-vars" class="primary" type="button">写入仓库变量</button>
-        <button id="copy-vars" type="button">复制变量清单</button>
-        <a id="vars-link" href="#" target="_blank" rel="noreferrer">打开 Variables</a>
-        <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
+        <button id="save-vars" class="primary" type="button">保存变量</button>
+        <button id="save-and-run" type="button">保存并刷步</button>
+        <button id="run-now" type="button">马上刷步</button>
+        <button id="copy-vars" type="button">复制清单</button>
       </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <h2>马上操作</h2>
-        <span class="muted">触发仓库里已有的工作流</span>
-      </div>
-      <div class="actions">
-        <button id="run-now" class="primary" type="button">马上刷步</button>
-        <button id="save-and-run" type="button">保存参数并刷步</button>
-        <button id="apply-cron" type="button">应用新定时</button>
-        <button id="refresh-pages" type="button">刷新看板</button>
-        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 手动跑刷步</a>
-      </div>
-      <p class="muted">马上刷步会带上当前填的最小/最大步数作为这一次的范围。保存参数并刷步会先写入 Variables。</p>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head">
-        <h2>账号与推送</h2>
-        <span class="muted">生成 CONFIG Secret，不自动提交</span>
-      </div>
+    <details class="panel more-panel">
+      <summary>账号 CONFIG（Secret，不自动提交）</summary>
       <form id="secret-form" class="form-grid"></form>
       <div class="actions">
         <button id="copy-config" class="primary" type="button">复制 CONFIG JSON</button>
         <a id="secrets-link" href="#" target="_blank" rel="noreferrer">打开 Secrets</a>
       </div>
       <pre id="config-preview" class="json"></pre>
-    </section>
+    </details>
+
+    <details class="panel more-panel">
+      <summary>其它工作流</summary>
+      <div class="actions">
+        <button id="apply-cron" type="button">应用新定时</button>
+        <button id="refresh-pages" type="button">刷新看板</button>
+        <a id="vars-link" href="#" target="_blank" rel="noreferrer">Variables</a>
+        <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
+        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 刷步</a>
+      </div>
+    </details>
   </main>
-  <footer>
-    <p>变量覆盖 CONFIG。改 <code>CRON_HOURS</code> 后，下次刷步成功或手动跑 Random Cron 才会换上新整点。</p>
-  </footer>
   <script src="./api.js"></script>
   <script src="./settings.js"></script>
 </body>
