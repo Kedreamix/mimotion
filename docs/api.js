@@ -44,6 +44,22 @@ window.MimoApi = (() => {
     return `https://github.com/${repo.owner}/${repo.repo}`;
   }
 
+  async function verifyPat(token) {
+    const headers = authHeaders(token);
+    const [userRes, repoRes] = await Promise.all([
+      fetch("https://api.github.com/user", { headers, cache: "no-store" }),
+      fetch(apiBase(), { headers, cache: "no-store" }),
+    ]);
+    if (!userRes.ok) throw new Error(`GitHub 鉴权失败（${userRes.status}）`);
+    if (!repoRes.ok) throw new Error(`无法验证仓库权限（${repoRes.status}）`);
+    const [user, repository] = await Promise.all([userRes.json(), repoRes.json()]);
+    const permissions = repository.permissions || {};
+    if (!(permissions.admin || permissions.maintain || permissions.push)) {
+      throw new Error("这个 GitHub 账号没有仓库写权限");
+    }
+    return user.login || "GitHub 用户";
+  }
+
   async function setVariable(token, name, value) {
     const encoded = encodeURIComponent(name);
     const headers = authHeaders(token);
@@ -91,6 +107,7 @@ window.MimoApi = (() => {
     authHeaders,
     apiBase,
     htmlBase,
+    verifyPat,
     setVariable,
     dispatchWorkflow,
     needPat,

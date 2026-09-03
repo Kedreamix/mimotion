@@ -215,7 +215,9 @@
 
 ### 状态看板（GitHub Pages）
 
-仓库带了一个简单的状态页，用来看最近刷步是否成功、当前步数、下次定时，以及最近的 Actions 记录。页面只读公开数据，不会展示密码或 Secret。
+仓库带了一个简单的状态页，用来看最近刷步是否成功、当前步数、下一次定时，以及最近的刷步记录。页面只读公开数据，不会展示密码或 Secret。
+
+「下次定时」只表示 **当前 `run.yml` 里已经写死的那一次**（对应 `cron_change_time` 里的 `next cron`）。刷步成功后 Random Cron 会重随分钟，所以时间轴只标整点，不会把同一个随机分钟套到全天。
 
 - 访问地址：`https://<你的GitHub用户名>.github.io/mimotion/`
 - 参数页：`https://<你的GitHub用户名>.github.io/mimotion/settings.html`
@@ -231,23 +233,43 @@
 | Secret `CONFIG` | `USER` `PWD` 以及各类推送 Token | 参数页复制 JSON，粘贴到 Secrets；或按步骤八导出后再改 |
 | 仓库 Variables | `MIN_STEP` `MAX_STEP` `CRON_HOURS` `SLEEP_GAP` `USE_CONCURRENT` `PUSH_PLUS_HOUR` `PUSH_PLUS_MAX` | 参数页写入，或 Actions 工作流「更新参数」 |
 
-`main.py` 会把 Variables 覆盖到 CONFIG 的同名键上：Variables 为空则继续用 CONFIG。看板圆环目标读快照里的 `MAX_STEP`。
+`main.py` 会把 Variables 覆盖到 CONFIG 的同名键上：Variables 为空则继续用 CONFIG。看板目标步数读快照里的 `MAX_STEP`。
+
+参数页会明确区分两类能力：
+
+- **游客刷步**：填写自己的 Zepp Life 账号，走 Cloudflare Worker，不动仓库账号。
+- **站长操作要鉴权**：改 Variables、刷仓库里保存的账号，需要 GitHub PAT。
+- **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
+
+看板默认是**只读模式**。访客可以看公开状态，也可以用**自己的** Zepp Life 账号走游客刷步；改仓库参数、刷仓库里保存的账号，必须先用 GitHub PAT 鉴权。PAT 只保存在当前浏览器的 `localStorage`。
+
+#### 游客刷步（Cloudflare Worker）
+
+游客表单提交到独立 Worker，**不会触发**仓库 `run.yml`，也**不会读取** Secret `CONFIG`。
+
+- 密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
+- 按 IP 限流（10 分钟 5 次）。
+- 本地验证：`node worker/dev-server.mjs`，看板会请求 `http://127.0.0.1:8787/guest-run`。
+- 上线：在 Cloudflare 绑定本仓库 `worker/` 后执行 `npx wrangler deploy`，Worker 名默认 `mimotion-guest`。把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`（若账号子域不是 `kedreamix`）。
+- Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
+
+没有部署 Worker 时，游客按钮会提示接口不可用，站长刷步不受影响。
 
 参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
 
 三种改 Variables 的方式：
 
-1. 打开参数页或看板的「马上操作」，可选填 PAT（只存在本机）。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
+1. 打开参数页，可选填 PAT（只存在本机）。看板也可以展开「本次范围与 PAT」后马上刷步。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
 2. 不想把 PAT 放浏览器：到 Actions 手动跑 `刷步数` / `更新参数`，它们使用仓库里的 `secrets.PAT`。
 3. 直接打开 [仓库 Variables](../../settings/variables/actions) 手工填写。`CRON_HOURS` 这里必须填 UTC。
 
 看板和参数页还接了这些接口：
 
-- **马上刷步**：触发 `刷步数` 工作流。可带上这一次的最小/最大步数，不改默认值。
-- **保存步数范围**：把最小/最大写入 Variables，之后定时任务也用这组值。
-- **保存并刷步**：先保存再立刻跑一次。
-- **应用新定时**：触发 `Random Cron`，按 `CRON_HOURS` 换上下一次整点。
-- **刷新看板**：重新发布 GitHub Pages 快照。
+- **游客刷步**：看板公开入口，使用访客自己的账号。
+- **刷仓库账号**：看板「刷仓库里的账号」，需要 GitHub 鉴权后才触发 `刷步数`。
+- **保存变量 / 保存并刷步**：在参数页写入 Variables。
+- **应用新定时**：参数页「其它工作流」，触发 `Random Cron`。
+- **刷新看板**：参数页「其它工作流」，重新发布 GitHub Pages 快照。
 
 没有接「提取配置信息」：那会把密码推到聊天里，不适合放在公开页面上。
 

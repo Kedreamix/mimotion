@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#07090d" />
-  <title>mimotion 参数</title>
+  <title>Kedreamix’s Zepp Life 自动刷步看板 · 控制台</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -15,80 +15,102 @@
     <div class="brand">
       <span class="logo" aria-hidden="true"></span>
       <div>
-        <h1>参数</h1>
-        <p>常改项写入仓库变量，账号密码仍放 Secret</p>
+        <h1>控制台</h1>
+        <p>Kedreamix’s Zepp Life 自动刷步看板</p>
       </div>
     </div>
-    <div class="top-meta">
-      <nav class="nav">
-        <a href="./">看板</a>
-        <a href="./settings.html" class="active">参数</a>
-      </nav>
-    </div>
+    <nav class="nav">
+      <a href="./">看板</a>
+      <a href="./settings.html" class="active">参数</a>
+    </nav>
   </header>
 
   <main>
     <p id="status" class="banner" hidden></p>
-    <section class="panel">
-      <div class="panel-head">
-        <h2>写入凭证</h2>
-      </div>
-      <p class="muted">PAT 只存在这个浏览器。马上刷步需要 <code>Actions</code> 读写，保存步数需要 <code>Variables</code> 读写。不填也可以去 Actions 手动跑。</p>
-      <label class="field">PAT
-        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
-      </label>
-      <div class="actions">
-        <button id="save-pat" type="button">保存在本机</button>
-        <button id="clear-pat" type="button">清除</button>
-        <button id="load-vars" type="button">读取当前变量</button>
-      </div>
+
+    <section class="capabilities" aria-label="页面能力">
+      <article class="capability can">
+        <span class="cap-icon" aria-hidden="true">↗</span>
+        <div>
+          <strong>游客可刷步</strong>
+          <p>填写自己的 Zepp Life 账号，不会动仓库里的账号</p>
+        </div>
+      </article>
+      <article class="capability locked">
+        <span class="cap-icon" aria-hidden="true">◇</span>
+        <div>
+          <strong>站长操作要鉴权</strong>
+          <p>改仓库参数、刷仓库账号需要 GitHub PAT</p>
+        </div>
+      </article>
     </section>
 
-    <section class="panel">
+    <details class="auth-card">
+      <summary>
+        <span><i class="auth-dot"></i>连接 GitHub</span>
+        <small>PAT 只保存在这个浏览器</small>
+      </summary>
+      <div class="auth-content">
+        <label class="field">Personal Access Token
+          <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
+        </label>
+        <div class="actions">
+          <button id="save-pat" type="button">保存并读取</button>
+          <button id="clear-pat" type="button">清除</button>
+          <button id="load-vars" type="button">读取当前变量</button>
+        </div>
+      </div>
+    </details>
+
+    <section class="panel settings-panel">
       <div class="panel-head">
-        <h2>常用参数</h2>
-        <span class="muted">空着表示不改。只会写入你改过的项，不会用默认值覆盖仓库里的其它变量</span>
+        <div>
+          <p class="eyebrow">DAILY</p>
+          <h2>日常设置</h2>
+        </div>
+        <span class="muted">空着不改</span>
       </div>
       <form id="tunable-form" class="form-grid"></form>
-      <div class="actions">
-        <button id="save-vars" class="primary" type="button">写入仓库变量</button>
-        <button id="copy-vars" type="button">复制变量清单</button>
-        <a id="vars-link" href="#" target="_blank" rel="noreferrer">打开 Variables</a>
-        <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
+      <div class="actions sticky-actions">
+        <button id="save-vars" class="primary" type="button">保存设置</button>
+        <button id="save-and-run" type="button">保存并马上刷步</button>
+        <button id="run-now" class="ghost" type="button">只马上刷步</button>
       </div>
+      <p class="action-note">马上刷步使用仓库里已经保存的账号和密码，不会使用下面尚未写入 Secret 的内容。</p>
     </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <h2>马上操作</h2>
-        <span class="muted">触发仓库里已有的工作流</span>
+    <details class="panel more-panel protected-panel">
+      <summary>
+        <span>账号与密码</span>
+        <small>受保护 · CONFIG Secret</small>
+      </summary>
+      <div class="protected-note">
+        <strong>不能在这里直接验证账号密码</strong>
+        <p>公开 Pages 不应把密码作为工作流输入。请在这里生成 CONFIG，复制后到 GitHub Secrets 更新，再回来看板点「马上刷步」验证。</p>
       </div>
+      <form id="secret-form" class="form-grid secret-grid"></form>
+      <pre id="config-preview" class="json"></pre>
       <div class="actions">
-        <button id="run-now" class="primary" type="button">马上刷步</button>
-        <button id="save-and-run" type="button">保存参数并刷步</button>
+        <button id="copy-config" class="primary" type="button">复制 CONFIG</button>
+        <a id="secrets-link" class="button-link" href="#" target="_blank" rel="noreferrer">去 Secrets 更新</a>
+      </div>
+    </details>
+
+    <details class="panel more-panel">
+      <summary>
+        <span>工具与手动入口</span>
+        <small>不常用</small>
+      </summary>
+      <div class="actions">
         <button id="apply-cron" type="button">应用新定时</button>
         <button id="refresh-pages" type="button">刷新看板</button>
-        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 手动跑刷步</a>
+        <button id="copy-vars" type="button">复制变量清单</button>
+        <a id="vars-link" href="#" target="_blank" rel="noreferrer">Variables</a>
+        <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
+        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 刷步</a>
       </div>
-      <p class="muted">马上刷步会带上当前填的最小/最大步数作为这一次的范围。保存参数并刷步会先写入 Variables。</p>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head">
-        <h2>账号与推送</h2>
-        <span class="muted">生成 CONFIG Secret，不自动提交</span>
-      </div>
-      <form id="secret-form" class="form-grid"></form>
-      <div class="actions">
-        <button id="copy-config" class="primary" type="button">复制 CONFIG JSON</button>
-        <a id="secrets-link" href="#" target="_blank" rel="noreferrer">打开 Secrets</a>
-      </div>
-      <pre id="config-preview" class="json"></pre>
-    </section>
+    </details>
   </main>
-  <footer>
-    <p>变量覆盖 CONFIG。改 <code>CRON_HOURS</code> 后，下次刷步成功或手动跑 Random Cron 才会换上新整点。</p>
-  </footer>
   <script src="./api.js"></script>
   <script src="./settings.js"></script>
 </body>

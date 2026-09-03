@@ -1,8 +1,8 @@
 (() => {
   const DEFAULT = { owner: "Kedreamix", repo: "mimotion" };
-  const RING = 2 * Math.PI * 92;
   const DEFAULT_STEP_GOAL = 25000;
   let stepGoal = DEFAULT_STEP_GOAL;
+  const schedule = window.MimoSchedule;
 
   const $ = (id) => document.getElementById(id);
 
@@ -56,69 +56,23 @@
     return new TextDecoder("utf-8").decode(bytes);
   }
 
-  function parseHoursBlock(block) {
-    const match = String(block || "").match(/北京时间:\s*'(\d+)\s+([\d,]+)/);
-    if (!match) return { minute: 0, hours: [] };
-    return {
-      minute: Number(match[1]),
-      hours: match[2].split(",").map((h) => Number(h)).filter((n) => !Number.isNaN(n)),
-    };
-  }
-
-  function unionHours(...lists) {
-    const set = new Set();
-    lists.forEach((list) => {
-      (list || []).forEach((n) => {
-        if (Number.isFinite(n)) set.add(Number(n));
-      });
-    });
-    return [...set].sort((a, b) => a - b);
-  }
-
   function applyParams(params) {
     const max = Number(params && params.MAX_STEP);
     const min = Number(params && params.MIN_STEP);
     if (Number.isFinite(max) && max > 0) {
       stepGoal = max;
-      const maxInput = document.getElementById("op-max");
+      const maxInput = $("op-max");
       if (maxInput && !maxInput.value) maxInput.value = String(max);
     }
     if (Number.isFinite(min) && min > 0) {
-      const minInput = document.getElementById("op-min");
+      const minInput = $("op-min");
       if (minInput && !minInput.value) minInput.value = String(min);
     }
   }
 
-  function parseCronFile(text) {
-    const [meta, stateRaw] = String(text || "").split("---STEP_STATE---");
-    const sync = (meta.match(/北京时间:\s*([\d-]+ [\d:]+)/) || [])[1] || "";
-    const nextExec = meta.match(/北京时间\((\d+):(\d+)\)/);
-    const current = parseHoursBlock((meta.split("current cron:")[1] || "").split("next cron:")[0]);
-    const next = parseHoursBlock(meta.split("next cron:")[1] || "");
-    let state = {};
-    try {
-      state = JSON.parse((stateRaw || "{}").trim() || "{}");
-    } catch {
-      state = {};
-    }
-    const accounts = Object.values(state);
-    const last = accounts.slice().sort((a, b) => String(b.last_step_date || "").localeCompare(String(a.last_step_date || "")))[0] || {};
-    return {
-      lastSyncText: sync,
-      nextHour: nextExec ? Number(nextExec[1]) : null,
-      nextMinute: nextExec ? Number(nextExec[2]) : (next.minute || current.minute || 0),
-      hours: unionHours(current.hours, next.hours),
-      minute: next.minute || current.minute || 0,
-      lastStep: Number(last.last_step || 0),
-      lastStepDate: last.last_step_date || "",
-      accountCount: accounts.length,
-    };
-  }
-
-  function setRing(step) {
+  function setBar(step) {
     const ratio = Math.max(0, Math.min(1, step / stepGoal));
-    $("ring-value").style.strokeDasharray = String(RING);
-    $("ring-value").style.strokeDashoffset = String(RING * (1 - ratio));
+    $("bar-value").style.width = `${Math.round(ratio * 100)}%`;
   }
 
   function minutesUntil(hour, minute) {
@@ -134,39 +88,43 @@
     const ok = latest && latest.conclusion === "success";
     const failed = latest && latest.conclusion === "failure";
     const card = $("status-card");
-    card.className = "status-card " + (ok ? "ok" : failed ? "bad" : "warn");
-    $("status-text").textContent = ok ? "运行正常" : failed ? "最近失败" : "状态未知";
+    card.className = "glance " + (ok ? "ok" : failed ? "bad" : "warn");
+    $("status-text").textContent = ok ? "正常" : failed ? "失败" : "未知";
     $("status-detail").textContent = latest
-      ? `最近一次刷步：${formatBJ(latest.updated_at || latest.created_at)} · ${latest.event === "schedule" ? "定时" : "手动"}`
-      : "还没有刷步工作流记录";
+      ? (latest.event === "schedule" ? "定时" : "手动")
+      : "还没有刷步记录";
 
     $("last-step").textContent = cron.lastStep ? cron.lastStep.toLocaleString("zh-CN") : "—";
     $("step-date").textContent = cron.lastStepDate
       ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${stepGoal.toLocaleString("zh-CN")}`
       : "暂无步数记录";
-    setRing(cron.lastStep || 0);
+    setBar(cron.lastStep || 0);
+    $("account-ready").textContent = cron.accountCount
+      ? `仓库里有 ${cron.accountCount} 个站长账号，刷它们需要 GitHub 鉴权`
+      : "刷仓库账号需要 GitHub 鉴权";
 
-    $("last-sync").textContent = cron.lastSyncText ? cron.lastSyncText.slice(-8) : (latest ? formatBJ(latest.updated_at).slice(-5) : "—");
+    $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
-    $("next-run").textContent = cron.nextHour == null ? "—" : `${pad(cron.nextHour)}:${pad(cron.nextMinute)}`;
-    $("account-count").textContent = cron.accountCount ? `${cron.accountCount} 个` : "—";
 
-    if (cron.nextHour != null) {
-      const remain = minutesUntil(cron.nextHour, cron.nextMinute);
-      $("next-run-rel").textContent = remain < 60 ? `约 ${remain} 分钟后` : `约 ${Math.max(1, Math.round(remain / 60))} 小时后`;
+    const now = beijingParts();
+    const slot = schedule.nextSlot(cron.liveHours, cron.liveMinute, now);
+    if (slot) {
+      $("next-run").textContent = `${pad(slot.hour)}:${pad(slot.minute)}`;
+      const remain = minutesUntil(slot.hour, slot.minute);
+      const wait = remain < 60 ? `约 ${remain} 分钟后` : `约 ${Math.max(1, Math.round(remain / 60))} 小时后`;
+      $("next-run-rel").textContent = `${wait} · 仅这一次`;
+    } else {
+      $("next-run").textContent = "—";
+      $("next-run-rel").textContent = "";
     }
 
-    const today = todayBJ();
-    const todayRuns = stepRuns.filter((r) => formatBJ(r.created_at).startsWith(today));
-    const success = todayRuns.filter((r) => r.conclusion === "success").length;
-    $("today-count").textContent = `${success}/${Math.max(todayRuns.length, cron.hours.length || 0)}`;
-    $("today-rate").textContent = todayRuns.length ? `${Math.round((success / todayRuns.length) * 100)}% 成功` : "今天还没跑完";
-    $("cron-caption").textContent = cron.hours.length
-      ? `计划整点 ${cron.hours.map((h) => `${h}:00`).join(" / ")}，分钟随机为 ${pad(cron.minute)}`
+    const hours = cron.plannedHours;
+    $("cron-caption").textContent = hours.length
+      ? `每天 ${hours.map((h) => `${h} 点`).join(" / ")} 附近。分钟每次成功后重随，不按同一分钟套全天。`
       : "尚未读到 cron 计划";
 
-    renderTimeline(cron, stepRuns);
-    renderRuns(runs.slice(0, 12));
+    renderTimeline(cron, stepRuns, slot);
+    renderRuns(stepRuns.slice(0, 8));
   }
 
   function relFromNow(date) {
@@ -178,8 +136,8 @@
     return `${Math.round(hour / 24)} 天前`;
   }
 
-  function renderTimeline(cron, stepRuns) {
-    const hours = cron.hours.length ? cron.hours : [9, 12, 15, 18, 22];
+  function renderTimeline(cron, stepRuns, slot) {
+    const hours = cron.plannedHours.length ? cron.plannedHours : [9, 12, 15, 18, 22];
     const nowH = beijingParts().h;
     const today = todayBJ();
     $("timeline").innerHTML = hours.map((hour) => {
@@ -188,40 +146,40 @@
         return stamp.startsWith(today) && Number(stamp.slice(11, 13)) === hour;
       });
       let cls = "";
-      let tag = "待执行";
+      let tag = "";
       if (hit && hit.conclusion === "success") {
         cls = "done";
-        tag = "已完成";
+        tag = "完成";
       } else if (hit && hit.conclusion === "failure") {
         cls = "miss";
         tag = "失败";
-      } else if (hour === cron.nextHour) {
+      } else if (slot && hour === slot.hour) {
         cls = "next";
-        tag = "下一次";
+        tag = "下次";
       } else if (hour < nowH) {
         cls = "miss";
-        tag = "已过点";
+        tag = "过点";
       }
-      return `<li class="${cls}"><span class="hour">${pad(hour)}:${pad(cron.minute || 0)}</span><span class="tag">${tag}</span></li>`;
+      return `<li class="${cls}"><span class="hour">${pad(hour)}</span><span class="tag">${tag || "整点"}</span></li>`;
     }).join("");
   }
 
   function renderRuns(runs) {
     if (!runs.length) {
-      $("runs").innerHTML = "<li>暂时没有公开的工作流记录。</li>";
+      $("runs").innerHTML = "<li>暂时没有刷步记录。</li>";
       return;
     }
     $("runs").innerHTML = runs.map((r) => {
       const cls = r.conclusion === "success" ? "success" : r.conclusion === "failure" ? "failure" : "";
-      const event = r.event === "schedule" ? "定时" : r.event === "workflow_dispatch" ? "手动" : r.event === "workflow_run" ? "联动" : r.event;
+      const event = r.event === "schedule" ? "定时" : r.event === "workflow_dispatch" ? "手动" : r.event;
       const state = r.conclusion === "success" ? "成功" : r.conclusion === "failure" ? "失败" : (r.status || "进行中");
       return `<li class="${cls}">
         <span class="dot"></span>
         <div>
-          <div class="name">${r.name || "workflow"} · ${state}</div>
+          <div class="name">${state}</div>
           <div class="meta">${event} · #${r.run_number || "-"}</div>
         </div>
-        <time>${formatBJ(r.updated_at || r.created_at)}</time>
+        <time>${formatBJ(r.updated_at || r.created_at).slice(5)}</time>
       </li>`;
     }).join("");
   }
@@ -276,13 +234,13 @@
         if (!snapshot) throw err;
         usedSnapshot = true;
       }
-      const cron = parseCronFile(data.cronText || "");
+      const cron = schedule.parseCronFile(data.cronText || "");
       renderStatus(cron, data.runs || []);
       if (usedSnapshot) {
-        $("status-detail").textContent = "实时接口暂不可用，正在显示最近一次 Pages 快照";
+        $("status-detail").textContent = "实时接口暂不可用，正在显示快照";
       }
     } catch (err) {
-      $("status-card").className = "status-card bad";
+      $("status-card").className = "glance bad";
       $("status-text").textContent = "读取失败";
       $("status-detail").textContent = String(err.message || err);
     } finally {
@@ -291,19 +249,44 @@
   }
 
   $("refresh").addEventListener("click", refresh);
-  $("clock").textContent = (() => {
+  function tick() {
     const p = beijingParts();
-    return `${pad(p.h)}:${pad(p.min)}:${pad(p.s)}`;
-  })();
-  setInterval(() => {
-    const p = beijingParts();
-    $("clock").textContent = `${pad(p.h)}:${pad(p.min)}:${pad(p.s)}`;
-  }, 1000);
+    $("clock").textContent = `${pad(p.h)}:${pad(p.min)}`;
+  }
+  tick();
+  setInterval(tick, 1000);
 
   const api = window.MimoApi;
-  $("run-workflow-link").href = `${htmlBase}/actions/workflows/run.yml`;
   const patInput = $("pat");
   if (patInput) patInput.value = localStorage.getItem(api.PAT_KEY) || "";
+  let authorized = false;
+
+  function setAuthorized(value, login = "") {
+    authorized = value;
+    $("auth-state").textContent = value ? `已鉴权 · ${login}` : "只读模式";
+    $("auth-state").classList.toggle("ready", value);
+    $("auth-summary").textContent = value
+      ? `${login} · GitHub 已连接`
+      : "连接 GitHub 后才能操作";
+    $("run-now").innerHTML = value
+      ? "马上刷步 <span>→</span>"
+      : "鉴权后刷步 <span>→</span>";
+  }
+
+  async function verifyToken(token, quiet = false) {
+    try {
+      const login = await api.verifyPat(token);
+      api.savePat(token);
+      setAuthorized(true, login);
+      if (!quiet) showOps(`已通过 GitHub 鉴权：${login}`, true);
+      return token;
+    } catch (err) {
+      setAuthorized(false);
+      $("auth-details").open = true;
+      if (!quiet) showOps(String(err.message || err), false);
+      return "";
+    }
+  }
 
   function showOps(text, ok) {
     const el = $("ops-status");
@@ -319,87 +302,82 @@
     };
   }
 
-  function requirePat(action) {
+  async function requirePat(action) {
     const token = api.getPat();
     if (!token) {
       showOps(api.needPat(action).message, false);
+      $("auth-details").open = true;
+      patInput.focus();
       return "";
     }
-    api.savePat(token);
-    return token;
-  }
-
-  async function dispatchRun(token) {
-    const { min, max } = stepInputs();
-    const inputs = {};
-    if (min) inputs.min_step = min;
-    if (max) inputs.max_step = max;
-    await api.dispatchWorkflow(token, "run.yml", inputs);
+    if (authorized && token === localStorage.getItem(api.PAT_KEY)) return token;
+    return verifyToken(token);
   }
 
   $("run-now").addEventListener("click", async () => {
-    const token = requirePat("马上刷步");
+    const token = await requirePat("马上刷步");
     if (!token) return;
     try {
-      await dispatchRun(token);
-      showOps("已触发马上刷步，几秒后刷新看板可看到新记录。", true);
+      const { min, max } = stepInputs();
+      const inputs = {};
+      if (min) inputs.min_step = min;
+      if (max) inputs.max_step = max;
+      await api.dispatchWorkflow(token, "run.yml", inputs);
+      showOps("已触发仓库账号刷步。", true);
     } catch (err) {
       showOps(String(err.message || err), false);
     }
   });
 
-  $("save-steps").addEventListener("click", async () => {
-    const token = requirePat("保存步数范围");
-    if (!token) return;
-    const { min, max } = stepInputs();
-    if (!min && !max) {
-      showOps("请先填写最小或最大步数。", false);
+  function showGuest(text, ok) {
+    const el = $("guest-status");
+    el.hidden = false;
+    el.className = "banner " + (ok ? "ok" : "bad");
+    el.textContent = text;
+  }
+
+  $("guest-run").addEventListener("click", async () => {
+    const user = ($("guest-user").value || "").trim();
+    const password = $("guest-pwd").value || "";
+    if (!user || !password) {
+      showGuest("请填写你自己的 Zepp Life 账号和密码。", false);
       return;
     }
-    try {
-      if (min) await api.setVariable(token, "MIN_STEP", min);
-      if (max) await api.setVariable(token, "MAX_STEP", max);
-      showOps("已保存步数范围到仓库变量。", true);
-    } catch (err) {
-      showOps(String(err.message || err), false);
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) {
+      showGuest("游客接口还没部署。", false);
+      return;
     }
-  });
-
-  $("save-and-run").addEventListener("click", async () => {
-    const token = requirePat("保存并刷步");
-    if (!token) return;
-    const { min, max } = stepInputs();
+    const payload = { user, password };
+    const min = ($("guest-min").value || "").trim();
+    const max = ($("guest-max").value || "").trim();
+    if (min) payload.min_step = Number(min);
+    if (max) payload.max_step = Number(max);
+    $("guest-run").disabled = true;
+    showGuest("正在提交到游客接口，不会写入仓库。", true);
     try {
-      if (min) await api.setVariable(token, "MIN_STEP", min);
-      if (max) await api.setVariable(token, "MAX_STEP", max);
-      await dispatchRun(token);
-      showOps("已保存步数范围并触发马上刷步。", true);
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      $("guest-pwd").value = "";
+      if (!res.ok || !body.ok) {
+        showGuest(body.error || `游客刷步失败（${res.status}）`, false);
+        return;
+      }
+      showGuest(body.message || `已同步 ${body.step} 步`, true);
     } catch (err) {
-      showOps(String(err.message || err), false);
-    }
-  });
-
-  $("apply-cron").addEventListener("click", async () => {
-    const token = requirePat("应用新定时");
-    if (!token) return;
-    try {
-      await api.dispatchWorkflow(token, "cron.yml", {});
-      showOps("已触发 Random Cron，会按 CRON_HOURS 换上下一次整点。", true);
-    } catch (err) {
-      showOps(String(err.message || err), false);
-    }
-  });
-
-  $("refresh-pages").addEventListener("click", async () => {
-    const token = requirePat("刷新看板");
-    if (!token) return;
-    try {
-      await api.dispatchWorkflow(token, "pages.yml", {});
-      showOps("已触发看板重新发布，大约半分钟后刷新页面。", true);
-    } catch (err) {
-      showOps(String(err.message || err), false);
+      $("guest-pwd").value = "";
+      showGuest(String(err.message || err) + "。如果是本地预览，请先启动 worker/dev-server.mjs。", false);
+    } finally {
+      $("guest-run").disabled = false;
     }
   });
 
   refresh();
+  const savedToken = localStorage.getItem(api.PAT_KEY) || "";
+  if (savedToken) verifyToken(savedToken, true);
+  else setAuthorized(false);
 })();

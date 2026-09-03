@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#07090d" />
-  <title>mimotion 看板</title>
-  <meta name="description" content="Zepp Life / 小米运动自动刷步状态看板" />
+  <title>Kedreamix’s Zepp Life 自动刷步看板</title>
+  <meta name="description" content="Kedreamix’s Zepp Life 自动刷步看板" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -17,123 +17,135 @@
       <span class="logo" aria-hidden="true"></span>
       <div>
         <h1>mimotion</h1>
-        <p>Zepp Life 自动刷步看板</p>
+        <p>Kedreamix’s Zepp Life 自动刷步看板</p>
       </div>
-      <nav class="nav" aria-label="页面">
-        <a href="./index.html" class="active">看板</a>
-        <a href="./settings.html">参数</a>
-      </nav>
     </div>
+    <nav class="nav" aria-label="页面">
+      <a href="./" class="active">看板</a>
+      <a href="./settings.html">参数</a>
+    </nav>
     <div class="top-meta">
-      <time id="clock" datetime="">--:--:--</time>
-      <span class="tz">北京时间</span>
+      <time id="clock">--:--</time>
       <button id="refresh" type="button">刷新</button>
     </div>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="ring-wrap">
-        <svg class="ring" viewBox="0 0 220 220" aria-hidden="true">
-          <circle class="ring-track" cx="110" cy="110" r="92" />
-          <circle class="ring-value" id="ring-value" cx="110" cy="110" r="92" />
-        </svg>
-        <div class="ring-center">
-          <span class="ring-label">最近步数</span>
-          <strong id="last-step">—</strong>
-          <span class="ring-sub" id="step-date">等待数据</span>
-        </div>
+    <section class="glance" id="status-card">
+      <div class="steps">
+        <p class="kicker">最近步数</p>
+        <strong id="last-step">—</strong>
+        <div class="bar" aria-hidden="true"><i id="bar-value"></i></div>
+        <span class="muted" id="step-date">等待数据</span>
       </div>
-
-      <div class="hero-side">
-        <div class="status-card" id="status-card">
-          <span class="status-dot" id="status-dot"></span>
-          <div>
-            <p class="kicker">当前状态</p>
-            <h2 id="status-text">加载中</h2>
-            <p class="muted" id="status-detail">正在读取仓库与 Actions 记录</p>
-          </div>
+      <dl class="facts">
+        <div>
+          <dt>状态</dt>
+          <dd id="status-text">加载中</dd>
+          <dd class="muted" id="status-detail"></dd>
         </div>
-        <div class="stat-grid">
-          <article>
-            <p class="kicker">上次同步</p>
-            <strong id="last-sync">—</strong>
-            <span id="last-sync-rel" class="muted"></span>
-          </article>
-          <article>
-            <p class="kicker">下次执行</p>
-            <strong id="next-run">—</strong>
-            <span id="next-run-rel" class="muted"></span>
-          </article>
-          <article>
-            <p class="kicker">今日刷步</p>
-            <strong id="today-count">—</strong>
-            <span id="today-rate" class="muted"></span>
-          </article>
-          <article>
-            <p class="kicker">账号</p>
-            <strong id="account-count">—</strong>
-            <span class="muted">脱敏哈希，不含密码</span>
-          </article>
+        <div>
+          <dt>下次定时</dt>
+          <dd id="next-run">—</dd>
+          <dd class="muted" id="next-run-rel"></dd>
         </div>
-      </div>
+        <div>
+          <dt>上次</dt>
+          <dd id="last-sync">—</dd>
+          <dd class="muted" id="last-sync-rel"></dd>
+        </div>
+      </dl>
     </section>
 
-    <section class="panel">
+    <section class="panel slim">
       <div class="panel-head">
-        <h2>马上操作</h2>
-        <span class="muted">步数范围写入 Variables；马上刷步会立刻触发工作流</span>
+        <h2>计划整点</h2>
+        <p class="muted" id="cron-caption">只标整点。具体分钟每次跑完后会重新随机。</p>
+      </div>
+      <ol class="hour-row" id="timeline"></ol>
+    </section>
+
+    <section class="panel guest-card">
+      <div class="action-heading">
+        <p class="eyebrow">GUEST</p>
+        <span class="auth-badge ready">游客</span>
+      </div>
+      <h2>用自己的账号刷步</h2>
+      <p class="muted">不会使用仓库里的账号。密码只用于这一次请求，页面和 Worker 都不会保存。</p>
+      <div class="ops-grid">
+        <label class="field">Zepp Life 账号
+          <input id="guest-user" type="text" autocomplete="username" placeholder="手机号或邮箱" />
+        </label>
+        <label class="field">密码
+          <input id="guest-pwd" type="password" autocomplete="current-password" placeholder="只用于这一次" />
+        </label>
+      </div>
+      <details class="more">
+        <summary>本次步数范围（可选）</summary>
+        <div class="ops-grid">
+          <label class="field">最小步数
+            <input id="guest-min" type="number" min="1000" step="1" placeholder="按当前时间估算" />
+          </label>
+          <label class="field">最大步数
+            <input id="guest-max" type="number" min="1000" step="1" placeholder="按当前时间估算" />
+          </label>
+        </div>
+      </details>
+      <div class="quick-row">
+        <button id="guest-run" class="primary run-button" type="button">游客刷步 <span>→</span></button>
+      </div>
+      <p id="guest-status" class="banner" hidden></p>
+    </section>
+
+    <section class="panel action-card">
+      <div class="action-copy">
+        <div class="action-heading">
+          <p class="eyebrow">QUICK ACTION</p>
+          <span id="auth-state" class="auth-badge">只读模式</span>
+        </div>
+        <h2>刷仓库里的账号</h2>
+        <p id="account-ready" class="muted">这是站长账号，需要 GitHub 鉴权</p>
+      </div>
+      <div class="quick-row">
+        <button id="run-now" class="primary run-button" type="button">鉴权后刷步 <span>→</span></button>
+        <a href="./settings.html">设置</a>
       </div>
       <p id="ops-status" class="banner" hidden></p>
-      <div class="ops-grid">
-        <label class="field">最小步数
-          <input id="op-min" type="number" min="1" step="1" placeholder="18000" />
+      <details class="more" id="auth-details">
+        <summary id="auth-summary">连接 GitHub 后才能操作</summary>
+        <div class="ops-grid">
+          <label class="field">最小步数
+            <input id="op-min" type="number" min="1" step="1" placeholder="沿用仓库" />
+          </label>
+          <label class="field">最大步数
+            <input id="op-max" type="number" min="1" step="1" placeholder="沿用仓库" />
+          </label>
+        </div>
+        <label class="field">PAT（只存在本机）
+          <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
         </label>
-        <label class="field">最大步数
-          <input id="op-max" type="number" min="1" step="1" placeholder="25000" />
-        </label>
-      </div>
-      <label class="field">PAT（只存在本机，触发工作流用）
-        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
-      </label>
-      <div class="actions">
-        <button id="run-now" class="primary" type="button">马上刷步</button>
-        <button id="save-steps" type="button">保存步数范围</button>
-        <button id="save-and-run" type="button">保存并刷步</button>
-        <button id="apply-cron" type="button">应用新定时</button>
-        <button id="refresh-pages" type="button">刷新看板</button>
-        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 手动跑</a>
-      </div>
-      <p class="muted">马上刷步可用当前填的最小/最大作为<strong>这一次</strong>的范围。点「保存步数范围」才会变成以后默认值。</p>
+        <p class="auth-help">访客只能读取看板。PAT 会向 GitHub 验证，并需要 Actions 读写权限才能触发刷步。</p>
+      </details>
     </section>
 
-    <section class="panel">
+    <section class="panel slim">
       <div class="panel-head">
-        <h2>今日时间轴</h2>
-        <p class="muted" id="cron-caption">按北京时间显示计划整点</p>
-      </div>
-      <ol class="timeline" id="timeline"></ol>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head">
-        <h2>最近执行</h2>
-        <a id="actions-link" href="#" target="_blank" rel="noreferrer">打开 Actions</a>
+        <h2>最近刷步</h2>
+        <a id="actions-link" href="#" target="_blank" rel="noreferrer">Actions</a>
       </div>
       <ul class="runs" id="runs"></ul>
     </section>
   </main>
 
   <footer>
-    <p>数据来自公开仓库文件 <code>cron_change_time</code> 与 GitHub Actions，不含账号密码。</p>
-    <p>
-      <a href="./settings.html">参数设置</a>
-      ·
+    <p>公开页不含账号密码。
       <a id="repo-link" href="#" target="_blank" rel="noreferrer">仓库</a>
       ·
       <a id="workflow-link" href="#" target="_blank" rel="noreferrer">刷步工作流</a>
     </p>
   </footer>
+  <script src="./schedule.js"></script>
+  <script src="./guest-config.js"></script>
   <script src="./api.js"></script>
   <script src="./app.js"></script>
 </body>
