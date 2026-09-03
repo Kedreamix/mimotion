@@ -91,8 +91,8 @@
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
     $("account-ready").textContent = cron.accountCount
-      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。这里用 GitHub PAT 可立刻刷一次。`
-      : "输入 GitHub PAT 即可立刻刷一次。";
+      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。连接 GitHub 后可立刻刷一次。`
+      : "连接 GitHub 后可立刻刷一次。";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -250,6 +250,17 @@
   const api = window.MimoApi;
   const patInput = $("pat");
   if (patInput) patInput.value = localStorage.getItem(api.PAT_KEY) || "";
+  let authorized = false;
+  let authorizedToken = "";
+
+  function setAuthorized(value, login = "") {
+    authorized = value;
+    authorizedToken = value ? api.getPat() : "";
+    const badge = $("auth-state");
+    badge.textContent = value ? `已鉴权 · ${login}` : "未连接";
+    badge.classList.toggle("ready", value);
+    $("run-now").innerHTML = value ? "马上刷步 <span>→</span>" : "鉴权后刷步 <span>→</span>";
+  }
 
   function showOps(text, ok) {
     const el = $("ops-status");
@@ -258,14 +269,47 @@
     el.textContent = text;
   }
 
-  $("run-now").addEventListener("click", async () => {
-    const token = (patInput && patInput.value.trim()) || api.getPat();
+  async function connectGitHub(quiet = false) {
+    const token = api.getPat();
     if (!token) {
-      showOps("请输入 GitHub PAT。看板地址是 https://kedreamix.github.io/mimotion/", false);
-      if (patInput) patInput.focus();
-      return;
+      setAuthorized(false);
+      if (!quiet) {
+        showOps("请先填写 GitHub PAT。", false);
+        if (patInput) patInput.focus();
+      }
+      return "";
     }
-    api.savePat(token);
+    try {
+      const login = await api.verifyPat(token);
+      api.savePat(token);
+      setAuthorized(true, login);
+      if (!quiet) showOps(`已连接 GitHub：${login}`, true);
+      return token;
+    } catch (err) {
+      setAuthorized(false);
+      if (!quiet) showOps(String(err.message || err), false);
+      return "";
+    }
+  }
+
+  async function requirePat(action) {
+    const token = api.getPat();
+    if (!token) {
+      showOps(api.needPat(action).message, false);
+      if (patInput) patInput.focus();
+      return "";
+    }
+    if (authorized && token === authorizedToken) return token;
+    return connectGitHub();
+  }
+
+  $("connect-github").addEventListener("click", () => {
+    connectGitHub();
+  });
+
+  $("run-now").addEventListener("click", async () => {
+    const token = await requirePat("马上刷步");
+    if (!token) return;
     $("run-now").disabled = true;
     showOps("正在通过 GitHub 触发仓库刷步…", true);
     try {
@@ -326,4 +370,6 @@
   });
 
   refresh();
+  setAuthorized(false);
+  if (localStorage.getItem(api.PAT_KEY)) connectGitHub(true);
 })();

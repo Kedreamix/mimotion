@@ -101,15 +101,19 @@
       <div class="action-copy">
         <div class="action-heading">
           <p class="eyebrow">OWNER</p>
-          <span class="auth-badge">站长</span>
+          <span id="auth-state" class="auth-badge">未连接</span>
         </div>
         <h2>刷我的账号</h2>
-        <p id="account-ready" class="muted">在看板用 GitHub PAT 马上刷步</p>
+        <p id="account-ready" class="muted">连接 GitHub 后即可马上刷步</p>
       </div>
       <label class="field">GitHub PAT
         <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
       </label>
+      <p class="auth-help">只保存在这个浏览器。Fine-grained token 勾选本仓库，并给 Actions 读写。
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">去创建</a>
+      </p>
       <div class="quick-row">
+        <button id="connect-github" type="button">连接 GitHub</button>
         <button id="run-now" class="primary run-button" type="button">马上刷步 <span>→</span></button>
         <a href="./settings.html">改参数</a>
       </div>

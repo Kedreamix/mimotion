@@ -242,7 +242,7 @@
 - **改仓库变量也要 PAT**：参数页写入 Variables、应用定时仍走 GitHub。
 - **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
 
-看板默认是**只读模式**。访客可以看公开状态。你自己立刻刷步：在 [看板](https://kedreamix.github.io/mimotion/) 输入 GitHub PAT（只保存在当前浏览器）。
+看板默认是**只读模式**。访客可以看公开状态。你自己立刻刷步：在 [看板](https://kedreamix.github.io/mimotion/) 点「连接 GitHub」，PAT 只保存在当前浏览器。
 
 #### 游客刷步（Cloudflare Worker，可选）
 

@@ -218,16 +218,22 @@
   $("pat").value = localStorage.getItem(PAT_KEY) || "";
   $("save-pat").addEventListener("click", async () => {
     const token = $("pat").value.trim();
-    localStorage.setItem(PAT_KEY, token);
     if (!token) {
-      showStatus("PAT 已保存在这个浏览器。", true);
+      window.MimoApi.savePat("");
+      showStatus("请先填写 GitHub PAT。", false);
       return;
     }
     try {
-      await loadVariables(token, schemaCache);
-      showStatus("PAT 已保存，并填入仓库当前变量。只会写入你改过的项。", true);
+      const login = await window.MimoApi.verifyPat(token);
+      window.MimoApi.savePat(token);
+      try {
+        await loadVariables(token, schemaCache);
+        showStatus(`已连接 GitHub（${login}），并填入仓库当前变量。`, true);
+      } catch (err) {
+        showStatus(`已连接 GitHub（${login}）。读取变量失败：${String(err.message || err)}`, false);
+      }
     } catch (err) {
-      showStatus("PAT 已保存。读取当前变量失败：" + String(err.message || err), false);
+      showStatus("GitHub 鉴权失败：" + String(err.message || err), false);
     }
   });
   $("clear-pat").addEventListener("click", () => {
