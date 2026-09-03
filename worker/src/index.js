@@ -1,4 +1,5 @@
 import { clientKey, createLimiter } from "./rate-limit.js";
+import { safeEqual } from "./secret.js";
 import { guestSync } from "./zepp.js";
 
 const limiterStore = new Map();
@@ -33,6 +34,21 @@ function json(data, status, origin, env) {
   });
 }
 
+function parseBody(request) {
+  return request.json();
+}
+
+async function runSync(user, password, body, fetchImpl) {
+  return guestSync({
+    user,
+    password,
+    minStep: body.min_step,
+    maxStep: body.max_step,
+    now: new Date(),
+    fetchImpl,
+  });
+}
+
 export async function handleRequest(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get("Origin") || "";
   const url = new URL(request.url);
@@ -42,32 +58,42 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
     return json({ ok: true, service: "mimotion-guest" }, 200, origin, env);
   }
-  if (request.method !== "POST" || (url.pathname !== "/" && url.pathname !== "/guest-run")) {
+  const path = url.pathname.replace(/\/$/, "") || "/";
+  const isGuest = request.method === "POST" && (path === "/" || path === "/guest-run");
+  const isOwner = request.method === "POST" && path === "/owner-run";
+  if (!isGuest && !isOwner) {
     return json({ ok: false, error: "找不到接口" }, 404, origin, env);
   }
   const allow = allowedOrigins(env);
   if (origin && !allow.includes(origin)) {
     return json({ ok: false, error: "来源不被允许" }, 403, origin, env);
   }
-  const limited = limiter(clientKey(request));
+  const limited = limiter(`${isOwner ? "owner" : "guest"}:${clientKey(request)}`);
   if (!limited.ok) {
     return json({ ok: false, error: "请求太频繁，请稍后再试" }, 429, origin, env);
   }
   let body;
   try {
-    body = await request.json();
+    body = await parseBody(request);
   } catch {
     return json({ ok: false, error: "请求格式不正确" }, 400, origin, env);
   }
   try {
-    const result = await guestSync({
-      user: body.user,
-      password: body.password,
-      minStep: body.min_step,
-      maxStep: body.max_step,
-      now: new Date(),
-      fetchImpl,
-    });
+    let result;
+    if (isOwner) {
+      if (!env.OWNER_PASSWORD) {
+        return json({ ok: false, error: "站长刷步还没配置 Worker 密钥" }, 503, origin, env);
+      }
+      if (!safeEqual(body.password, env.OWNER_PASSWORD)) {
+        return json({ ok: false, error: "站长密码不对" }, 401, origin, env);
+      }
+      if (!env.OWNER_USER || !env.OWNER_PWD) {
+        return json({ ok: false, error: "站长刷步还没配置 Worker 密钥" }, 503, origin, env);
+      }
+      result = await runSync(env.OWNER_USER, env.OWNER_PWD, body, fetchImpl);
+    } else {
+      result = await runSync(body.user, body.password, body, fetchImpl);
+    }
     return json({
       ok: true,
       step: result.step,

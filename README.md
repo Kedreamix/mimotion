@@ -28,7 +28,7 @@
 - 选择token有效期，最大时长为1年。一年后需要重新续期或重建，唯一缺点
 - `Repository access` 选择 `Only select repositories` 勾选自己fork后的仓库，下拉可搜索：输入 mimotion 进行检索
 - 点击 `Repository permissions` 展开菜单，并勾选以下权限即可，其他的可以不勾选
-    - `Actions` Access: `Read and write` 用于获取 Actions 权限，以及页面上的「马上刷步」
+    - `Actions` Access: `Read and write` 用于获取 Actions 权限，以及参数页触发「应用新定时」「刷新看板」
     - `Contents` Access: `Read and write` 用于更新定时任务和日志文件的权限
     - `Metadata` Access: `Read-only` 这个自带的必选
     - `Workflows` Access: `Read and write` 获取用于更新 `.github/workflow` 下文件的权限
@@ -238,10 +238,11 @@
 参数页会明确区分两类能力：
 
 - **游客刷步**：填写自己的 Zepp Life 账号，走 Cloudflare Worker，不动仓库账号。
-- **站长操作要鉴权**：改 Variables、刷仓库里保存的账号，需要 GitHub PAT。
+- **站长刷步只要密码**：看板输入 Worker 里配置的站长密码，立即刷你自己的号，不用 GitHub PAT。
+- **改仓库变量才要 PAT**：参数页写入 Variables、应用定时仍走 GitHub。
 - **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
 
-看板默认是**只读模式**。访客可以看公开状态，也可以用**自己的** Zepp Life 账号走游客刷步；改仓库参数、刷仓库里保存的账号，必须先用 GitHub PAT 鉴权。PAT 只保存在当前浏览器的 `localStorage`。
+看板默认是**只读模式**。访客可以看公开状态，也可以用**自己的** Zepp Life 账号走游客刷步。你自己立刻刷步：在看板输入**站长密码**（存在 Cloudflare Worker Secret，不写进网页）。改仓库参数才需要 GitHub PAT。
 
 #### 游客刷步（Cloudflare Worker）
 
@@ -250,24 +251,25 @@
 - 密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
 - 按 IP 限流（10 分钟 5 次）。
 - 本地验证：`node worker/dev-server.mjs`，看板会请求 `http://127.0.0.1:8787/guest-run`。
-- 上线：在 Cloudflare 绑定本仓库 `worker/` 后执行 `npx wrangler deploy`，Worker 名默认 `mimotion-guest`。把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`（若账号子域不是 `kedreamix`）。
+- 上线：`npx wrangler deploy`，再配置三个 Secret：`OWNER_PASSWORD`（看板站长密码）、`OWNER_USER`、`OWNER_PWD`（你的 Zepp Life 账号）。
+- 站长刷步走 `POST /owner-run`，只带密码，不把 Zepp 密码发到浏览器逻辑之外的 GitHub。
 - Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
 
-没有部署 Worker 时，游客按钮会提示接口不可用，站长刷步不受影响。
+没有部署 Worker 时，游客刷步和站长密码刷步都会提示接口不可用。定时任务仍走 GitHub Actions，不受影响。
 
 参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
 
 三种改 Variables 的方式：
 
-1. 打开参数页，可选填 PAT（只存在本机）。看板也可以展开「本次范围与 PAT」后马上刷步。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
-2. 不想把 PAT 放浏览器：到 Actions 手动跑 `刷步数` / `更新参数`，它们使用仓库里的 `secrets.PAT`。
+1. 打开参数页，可选填 PAT（只存在本机）。Fine-grained token 需要 `Variables: Read and write`（保存设置）和 `Actions: Read and write`（应用定时 / 刷新看板）。马上刷步不需要 PAT。
+2. 不想把 PAT 放浏览器：到 Actions 手动跑 `更新参数`，它使用仓库里的 `secrets.PAT`。立刻刷步请回看板输入站长密码。
 3. 直接打开 [仓库 Variables](../../settings/variables/actions) 手工填写。`CRON_HOURS` 这里必须填 UTC。
 
 看板和参数页还接了这些接口：
 
 - **游客刷步**：看板公开入口，使用访客自己的账号。
-- **刷仓库账号**：看板「刷仓库里的账号」，需要 GitHub 鉴权后才触发 `刷步数`。
-- **保存变量 / 保存并刷步**：在参数页写入 Variables。
+- **站长马上刷步**：看板输入站长密码，由 Worker 刷你配置在 Worker Secret 里的账号，不走 GitHub。
+- **保存变量**：参数页写入 Variables，仍需要 GitHub PAT。
 - **应用新定时**：参数页「其它工作流」，触发 `Random Cron`。
 - **刷新看板**：参数页「其它工作流」，重新发布 GitHub Pages 快照。
 

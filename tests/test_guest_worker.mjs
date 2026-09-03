@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest } from "../worker/src/index.js";
+import { safeEqual } from "../worker/src/secret.js";
 import { applyBandTemplate, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
 
@@ -10,6 +11,22 @@ const PYTHON_HEX = "c43c0bbec04ee1b3f430164f237ae2a2cb66e050c21445c97064dfdaea58
 
 function hex(bytes) {
   return [...bytes].map((n) => n.toString(16).padStart(2, "0")).join("");
+}
+
+async function decryptHuami(cipher) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode("xeNtBVqzDc6tuNTh"),
+    { name: "AES-CBC" },
+    false,
+    ["decrypt"],
+  );
+  const plain = await crypto.subtle.decrypt(
+    { name: "AES-CBC", iv: new TextEncoder().encode("MAAAYAAAAAAAAABg") },
+    key,
+    cipher,
+  );
+  return new TextDecoder().decode(plain);
 }
 
 test("AES-CBC matches Python Huami login encryption", async () => {
@@ -113,4 +130,105 @@ test("guest handler mocked login and sync does not persist password", async () =
   assert.equal(payload.body.step, 12000);
   assert.equal(payload.body.user.includes("guest-secret"), false);
   assert.equal(JSON.stringify(payload.body).includes("guest-secret"), false);
+});
+
+test("safeEqual rejects mismatched passwords", () => {
+  assert.equal(safeEqual("secret", "secret"), true);
+  assert.equal(safeEqual("secret", "wrong"), false);
+  assert.equal(safeEqual("secret", ""), false);
+});
+
+function ownerEnv(extra = {}) {
+  return {
+    ALLOWED_ORIGINS: "https://kedreamix.github.io",
+    OWNER_PASSWORD: "secret",
+    ...extra,
+  };
+}
+
+function ownerRequest(body, ip = "owner-test") {
+  return new Request("https://guest.test/owner-run", {
+    method: "POST",
+    headers: {
+      Origin: "https://kedreamix.github.io",
+      "content-type": "application/json",
+      "CF-Connecting-IP": ip,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+test("owner-run returns 503 when owner password secret is missing", async () => {
+  const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-missing"), {
+    ALLOWED_ORIGINS: "https://kedreamix.github.io",
+  });
+  const payload = await read(res);
+  assert.equal(payload.status, 503);
+  assert.equal(payload.body.ok, false);
+});
+
+test("owner-run returns 401 for wrong password", async () => {
+  const res = await handleRequest(
+    ownerRequest({ password: "wrong" }, "ip-wrong"),
+    ownerEnv({ OWNER_USER: "17600000000", OWNER_PWD: "owner-zepp" }),
+  );
+  const payload = await read(res);
+  assert.equal(payload.status, 401);
+  assert.match(payload.body.error, /密码/);
+});
+
+test("owner-run returns 503 when zepp secrets are missing after password check", async () => {
+  const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-zepp"), ownerEnv());
+  const payload = await read(res);
+  assert.equal(payload.status, 503);
+});
+
+test("owner-run uses OWNER_USER/OWNER_PWD instead of body credentials", async () => {
+  let loginBody = null;
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
+  const wrapped = async (url, options = {}) => {
+    if (String(url).includes("api-user.zepp.com")) loginBody = options.body;
+    return fetchImpl(url, options);
+  };
+  const res = await handleRequest(
+    ownerRequest({
+      password: "secret",
+      user: "attacker",
+      pwd: "attacker-pwd",
+      min_step: 12000,
+      max_step: 12000,
+    }, "ip-owner-ok"),
+    ownerEnv({ OWNER_USER: "17600000000", OWNER_PWD: "owner-zepp" }),
+    wrapped,
+  );
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.ok, true);
+  assert.equal(payload.body.step, 12000);
+  assert.equal(payload.body.user, "+86****0000");
+  assert.equal(JSON.stringify(payload.body).includes("secret"), false);
+  assert.equal(JSON.stringify(payload.body).includes("owner-zepp"), false);
+  const plain = await decryptHuami(loginBody);
+  assert.match(plain, /emailOrPhone=%2B8617600000000/);
+  assert.match(plain, /password=owner-zepp/);
+  assert.equal(plain.includes("attacker"), false);
 });

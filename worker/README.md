@@ -1,13 +1,18 @@
 # mimotion-guest
 
-游客刷步接口。接收一次 Zepp Life 账号密码，登录并提交步数后丢弃凭证。
+游客刷步，以及站长用独立密码刷自己的账号。
 
 ```bash
 npx wrangler deploy
+npx wrangler secret put OWNER_PASSWORD
+npx wrangler secret put OWNER_USER
+npx wrangler secret put OWNER_PWD
 ```
 
-生产环境把 `docs/guest-config.js` 里的 Worker 地址改成部署结果。本地：
+`OWNER_PASSWORD` 是看板上的站长密码，不要写进仓库。`OWNER_USER` / `OWNER_PWD` 是你的 Zepp Life 账号。
+
+本地：
 
 ```bash
-node worker/dev-server.mjs
+OWNER_PASSWORD=demo OWNER_USER=13800138000 OWNER_PWD=secret node worker/dev-server.mjs
 ```

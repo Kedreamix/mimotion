@@ -295,42 +295,6 @@
     return token;
   }
 
-  $("run-now").addEventListener("click", async () => {
-    const token = tokenOrHint("马上刷步");
-    if (!token) return;
-    try {
-      const form = $("tunable-form").elements;
-      const inputs = {};
-      if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
-      if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
-      await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
-      showStatus("已触发马上刷步，几秒后回看板刷新即可看到结果。", true);
-    } catch (err) {
-      showStatus(String(err.message || err), false);
-    }
-  });
-
-  $("save-and-run").addEventListener("click", async () => {
-    const token = tokenOrHint("保存并刷步");
-    if (!token) return;
-    try {
-      const pairs = await persistTunable(token);
-      const form = $("tunable-form").elements;
-      const inputs = {};
-      if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
-      if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
-      await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
-      showStatus(
-        pairs.length
-          ? `已保存 ${pairs.map((item) => item.name).join(", ")} 并触发马上刷步。`
-          : "没有改动过的仓库变量，已按当前表单触发马上刷步。",
-        true,
-      );
-    } catch (err) {
-      showStatus(String(err.message || err), false);
-    }
-  });
-
   $("apply-cron").addEventListener("click", async () => {
     const token = tokenOrHint("应用新定时");
     if (!token) return;

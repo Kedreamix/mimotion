@@ -5,6 +5,9 @@ const port = Number(process.env.PORT || 8787);
 const env = {
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
     || "http://127.0.0.1:8765,http://localhost:8765,http://127.0.0.1:8787",
+  OWNER_PASSWORD: process.env.OWNER_PASSWORD || "",
+  OWNER_USER: process.env.OWNER_USER || "",
+  OWNER_PWD: process.env.OWNER_PWD || "",
 };
 
 createServer(async (req, res) => {

@@ -58,16 +58,7 @@
 
   function applyParams(params) {
     const max = Number(params && params.MAX_STEP);
-    const min = Number(params && params.MIN_STEP);
-    if (Number.isFinite(max) && max > 0) {
-      stepGoal = max;
-      const maxInput = $("op-max");
-      if (maxInput && !maxInput.value) maxInput.value = String(max);
-    }
-    if (Number.isFinite(min) && min > 0) {
-      const minInput = $("op-min");
-      if (minInput && !minInput.value) minInput.value = String(min);
-    }
+    if (Number.isFinite(max) && max > 0) stepGoal = max;
   }
 
   function setBar(step) {
@@ -100,8 +91,8 @@
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
     $("account-ready").textContent = cron.accountCount
-      ? `仓库里有 ${cron.accountCount} 个站长账号，刷它们需要 GitHub 鉴权`
-      : "刷仓库账号需要 GitHub 鉴权";
+      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。这里输入站长密码可立刻刷一次。`
+      : "输入站长密码即可立刻刷一次，不用 GitHub。";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -256,38 +247,6 @@
   tick();
   setInterval(tick, 1000);
 
-  const api = window.MimoApi;
-  const patInput = $("pat");
-  if (patInput) patInput.value = localStorage.getItem(api.PAT_KEY) || "";
-  let authorized = false;
-
-  function setAuthorized(value, login = "") {
-    authorized = value;
-    $("auth-state").textContent = value ? `已鉴权 · ${login}` : "只读模式";
-    $("auth-state").classList.toggle("ready", value);
-    $("auth-summary").textContent = value
-      ? `${login} · GitHub 已连接`
-      : "连接 GitHub 后才能操作";
-    $("run-now").innerHTML = value
-      ? "马上刷步 <span>→</span>"
-      : "鉴权后刷步 <span>→</span>";
-  }
-
-  async function verifyToken(token, quiet = false) {
-    try {
-      const login = await api.verifyPat(token);
-      api.savePat(token);
-      setAuthorized(true, login);
-      if (!quiet) showOps(`已通过 GitHub 鉴权：${login}`, true);
-      return token;
-    } catch (err) {
-      setAuthorized(false);
-      $("auth-details").open = true;
-      if (!quiet) showOps(String(err.message || err), false);
-      return "";
-    }
-  }
-
   function showOps(text, ok) {
     const el = $("ops-status");
     el.hidden = false;
@@ -295,37 +254,38 @@
     el.textContent = text;
   }
 
-  function stepInputs() {
-    return {
-      min: ($("op-min").value || "").trim(),
-      max: ($("op-max").value || "").trim(),
-    };
-  }
-
-  async function requirePat(action) {
-    const token = api.getPat();
-    if (!token) {
-      showOps(api.needPat(action).message, false);
-      $("auth-details").open = true;
-      patInput.focus();
-      return "";
-    }
-    if (authorized && token === localStorage.getItem(api.PAT_KEY)) return token;
-    return verifyToken(token);
-  }
-
   $("run-now").addEventListener("click", async () => {
-    const token = await requirePat("马上刷步");
-    if (!token) return;
+    const password = ($("owner-pwd").value || "").trim();
+    if (!password) {
+      showOps("请输入站长密码。", false);
+      $("owner-pwd").focus();
+      return;
+    }
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) {
+      showOps("刷步接口还没部署。", false);
+      return;
+    }
+    $("run-now").disabled = true;
+    showOps("正在用站长密码刷步，不会走 GitHub。", true);
     try {
-      const { min, max } = stepInputs();
-      const inputs = {};
-      if (min) inputs.min_step = min;
-      if (max) inputs.max_step = max;
-      await api.dispatchWorkflow(token, "run.yml", inputs);
-      showOps("已触发仓库账号刷步。", true);
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const body = await res.json().catch(() => ({}));
+      $("owner-pwd").value = "";
+      if (!res.ok || !body.ok) {
+        showOps(body.error || `刷步失败（${res.status}）`, false);
+        return;
+      }
+      showOps(body.message || `已同步 ${body.step} 步`, true);
     } catch (err) {
-      showOps(String(err.message || err), false);
+      $("owner-pwd").value = "";
+      showOps(String(err.message || err) + "。本地预览请先启动 worker/dev-server.mjs。", false);
+    } finally {
+      $("run-now").disabled = false;
     }
   });
 
@@ -377,7 +337,4 @@
   });
 
   refresh();
-  const savedToken = localStorage.getItem(api.PAT_KEY) || "";
-  if (savedToken) verifyToken(savedToken, true);
-  else setAuthorized(false);
 })();
