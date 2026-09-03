@@ -96,7 +96,7 @@ window.MimoApi = (() => {
   }
 
   function needPat(action) {
-    return new Error(`还没有 PAT，无法${action}。Fine-grained 需要 Actions 读写（触发工作流）和 Variables 读写（保存步数）。`);
+    return new Error(`还没有登录 GitHub，无法${action}。请点「用 GitHub 登录」，或展开粘贴 PAT。`);
   }
 
   return {

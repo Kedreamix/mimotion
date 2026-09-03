@@ -186,9 +186,7 @@ dd.muted { font-size: 12px; margin-top: 3px; }
 
 .action-card {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 14px;
+  gap: 12px;
   background:
     linear-gradient(120deg, rgba(255, 90, 31, 0.08), transparent 45%),
     var(--card);

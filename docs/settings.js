@@ -218,16 +218,22 @@
   $("pat").value = localStorage.getItem(PAT_KEY) || "";
   $("save-pat").addEventListener("click", async () => {
     const token = $("pat").value.trim();
-    localStorage.setItem(PAT_KEY, token);
     if (!token) {
-      showStatus("PAT 已保存在这个浏览器。", true);
+      window.MimoApi.savePat("");
+      showStatus("请先填写 GitHub PAT。", false);
       return;
     }
     try {
-      await loadVariables(token, schemaCache);
-      showStatus("PAT 已保存，并填入仓库当前变量。只会写入你改过的项。", true);
+      const login = await window.MimoApi.verifyPat(token);
+      window.MimoApi.savePat(token);
+      try {
+        await loadVariables(token, schemaCache);
+        showStatus(`已连接 GitHub（${login}），并填入仓库当前变量。`, true);
+      } catch (err) {
+        showStatus(`已连接 GitHub（${login}）。读取变量失败：${String(err.message || err)}`, false);
+      }
     } catch (err) {
-      showStatus("PAT 已保存。读取当前变量失败：" + String(err.message || err), false);
+      showStatus("GitHub 鉴权失败：" + String(err.message || err), false);
     }
   });
   $("clear-pat").addEventListener("click", () => {
@@ -294,42 +300,6 @@
     api.savePat(token);
     return token;
   }
-
-  $("run-now").addEventListener("click", async () => {
-    const token = tokenOrHint("马上刷步");
-    if (!token) return;
-    try {
-      const form = $("tunable-form").elements;
-      const inputs = {};
-      if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
-      if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
-      await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
-      showStatus("已触发马上刷步，几秒后回看板刷新即可看到结果。", true);
-    } catch (err) {
-      showStatus(String(err.message || err), false);
-    }
-  });
-
-  $("save-and-run").addEventListener("click", async () => {
-    const token = tokenOrHint("保存并刷步");
-    if (!token) return;
-    try {
-      const pairs = await persistTunable(token);
-      const form = $("tunable-form").elements;
-      const inputs = {};
-      if ((form.MIN_STEP || {}).value) inputs.min_step = String(form.MIN_STEP.value).trim();
-      if ((form.MAX_STEP || {}).value) inputs.max_step = String(form.MAX_STEP.value).trim();
-      await window.MimoApi.dispatchWorkflow(token, "run.yml", inputs);
-      showStatus(
-        pairs.length
-          ? `已保存 ${pairs.map((item) => item.name).join(", ")} 并触发马上刷步。`
-          : "没有改动过的仓库变量，已按当前表单触发马上刷步。",
-        true,
-      );
-    } catch (err) {
-      showStatus(String(err.message || err), false);
-    }
-  });
 
   $("apply-cron").addEventListener("click", async () => {
     const token = tokenOrHint("应用新定时");

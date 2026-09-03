@@ -3,4 +3,5 @@ main = "src/index.js"
 compatibility_date = "2024-09-23"
 
 [vars]
-ALLOWED_ORIGINS = "https://kedreamix.github.io,http://127.0.0.1:8765,http://localhost:8765,http://127.0.0.1:8787"
+ALLOWED_ORIGINS = "https://kedreamix.github.io/mimotion,http://127.0.0.1:8765,http://localhost:8765,http://127.0.0.1:8787"
+OAUTH_REDIRECT_URI = "https://kedreamix.github.io/mimotion/"

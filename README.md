@@ -28,7 +28,7 @@
 - 选择token有效期，最大时长为1年。一年后需要重新续期或重建，唯一缺点
 - `Repository access` 选择 `Only select repositories` 勾选自己fork后的仓库，下拉可搜索：输入 mimotion 进行检索
 - 点击 `Repository permissions` 展开菜单，并勾选以下权限即可，其他的可以不勾选
-    - `Actions` Access: `Read and write` 用于获取 Actions 权限，以及页面上的「马上刷步」
+    - `Actions` Access: `Read and write` 用于获取 Actions 权限，以及看板上的「马上刷步」
     - `Contents` Access: `Read and write` 用于更新定时任务和日志文件的权限
     - `Metadata` Access: `Read-only` 这个自带的必选
     - `Workflows` Access: `Read and write` 获取用于更新 `.github/workflow` 下文件的权限
@@ -237,37 +237,57 @@
 
 参数页会明确区分两类能力：
 
-- **游客刷步**：填写自己的 Zepp Life 账号，走 Cloudflare Worker，不动仓库账号。
-- **站长操作要鉴权**：改 Variables、刷仓库里保存的账号，需要 GitHub PAT。
+- **游客刷步**：本地或已部署的 Worker 上，填写自己的 Zepp Life 账号，不动仓库账号。
+- **站长马上刷步**：打开 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)，点「用 GitHub 登录」跳到 GitHub，回来后直接刷步。也可以展开粘贴 PAT。
+- **改仓库变量也要 PAT**：参数页写入 Variables、应用定时仍走 GitHub。
 - **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
 
-看板默认是**只读模式**。访客可以看公开状态，也可以用**自己的** Zepp Life 账号走游客刷步；改仓库参数、刷仓库里保存的账号，必须先用 GitHub PAT 鉴权。PAT 只保存在当前浏览器的 `localStorage`。
+看板默认是**只读模式**。访客可以看公开状态。你自己立刻刷步：在 [看板](https://kedreamix.github.io/mimotion/) 点「用 GitHub 登录」，会跳到 GitHub 授权后回到看板，不用手填 token。
 
-#### 游客刷步（Cloudflare Worker）
+#### 用 GitHub 登录（不用粘贴 PAT）
+
+公开 Pages 不能保管 OAuth Client Secret，所以换票走 Worker，看板地址仍是 `https://kedreamix.github.io/mimotion/`。
+
+1. 打开 [GitHub OAuth Apps](https://github.com/settings/developers) 新建应用。
+2. Homepage：`https://kedreamix.github.io/mimotion/`
+3. Authorization callback URL：`https://kedreamix.github.io/mimotion/`（本地调试再加一条 `http://127.0.0.1:8765/`）
+4. 把 Client ID / Client Secret 写入 Worker：
+
+```bash
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler deploy
+```
+
+5. 把 `docs/guest-config.js` 里生产环境的 `MIMO_GUEST_API` 改成 wrangler 打印的 `*.workers.dev` 地址。
+
+OAuth 权限是 `public_repo`，用来触发公开仓库的 `刷步数`。没配 OAuth 时，仍可展开「改用粘贴 PAT」。
+
+#### 游客刷步（Cloudflare Worker，可选）
 
 游客表单提交到独立 Worker，**不会触发**仓库 `run.yml`，也**不会读取** Secret `CONFIG`。
 
 - 密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
 - 按 IP 限流（10 分钟 5 次）。
 - 本地验证：`node worker/dev-server.mjs`，看板会请求 `http://127.0.0.1:8787/guest-run`。
-- 上线：在 Cloudflare 绑定本仓库 `worker/` 后执行 `npx wrangler deploy`，Worker 名默认 `mimotion-guest`。把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`（若账号子域不是 `kedreamix`）。
+- 允许的来源按看板地址匹配：`https://kedreamix.github.io/mimotion/`（浏览器 Origin 不含路径，Worker 会按站点 origin 放行）。
 - Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
 
-没有部署 Worker 时，游客按钮会提示接口不可用，站长刷步不受影响。
+没有部署 Worker 时，游客刷步和「用 GitHub 登录」会提示接口不可用。仍可展开粘贴 PAT 马上刷步。
 
 参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
 
 三种改 Variables 的方式：
 
-1. 打开参数页，可选填 PAT（只存在本机）。看板也可以展开「本次范围与 PAT」后马上刷步。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
+1. 打开 [看板](https://kedreamix.github.io/mimotion/) 或参数页，可选填 PAT（只存在本机）。Fine-grained token 需要 `Actions: Read and write`（马上刷步 / 应用定时 / 刷新看板）和 `Variables: Read and write`（保存设置）。
 2. 不想把 PAT 放浏览器：到 Actions 手动跑 `刷步数` / `更新参数`，它们使用仓库里的 `secrets.PAT`。
 3. 直接打开 [仓库 Variables](../../settings/variables/actions) 手工填写。`CRON_HOURS` 这里必须填 UTC。
 
 看板和参数页还接了这些接口：
 
-- **游客刷步**：看板公开入口，使用访客自己的账号。
-- **刷仓库账号**：看板「刷仓库里的账号」，需要 GitHub 鉴权后才触发 `刷步数`。
-- **保存变量 / 保存并刷步**：在参数页写入 Variables。
+- **游客刷步**：可选，使用访客自己的账号（需本地或已部署的 Worker）。
+- **站长马上刷步**：看板「用 GitHub 登录」跳转授权，或粘贴 PAT，地址是 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。
+- **保存变量**：参数页写入 Variables，仍需要 GitHub PAT。
 - **应用新定时**：参数页「其它工作流」，触发 `Random Cron`。
 - **刷新看板**：参数页「其它工作流」，重新发布 GitHub Pages 快照。
 
