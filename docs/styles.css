@@ -184,14 +184,36 @@ dd.muted { font-size: 12px; margin-top: 3px; }
     linear-gradient(120deg, rgba(255, 90, 31, 0.08), transparent 45%),
     var(--card);
 }
+.action-heading { display: flex; align-items: center; gap: 8px; }
 .action-copy h2 { margin: 2px 0 4px; font-size: 17px; }
 .action-copy p { margin: 0; font-size: 12px; }
+.auth-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 200, 87, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 200, 87, 0.07);
+  color: var(--warn);
+  font-size: 10px;
+}
+.auth-badge.ready {
+  border-color: rgba(61, 214, 140, 0.22);
+  background: rgba(61, 214, 140, 0.08);
+  color: var(--ok);
+}
 .quick-row { display: flex; align-items: center; gap: 12px; }
 .run-button { padding: 9px 15px; }
 .run-button span { margin-left: 8px; }
 .action-card > .banner,
 .action-card > .more { grid-column: 1 / -1; }
 .more { margin-top: 10px; }
+.auth-help {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
 .more summary, .more-panel summary {
   cursor: pointer;
   color: var(--muted);

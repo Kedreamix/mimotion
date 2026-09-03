@@ -259,6 +259,34 @@
   const api = window.MimoApi;
   const patInput = $("pat");
   if (patInput) patInput.value = localStorage.getItem(api.PAT_KEY) || "";
+  let authorized = false;
+
+  function setAuthorized(value, login = "") {
+    authorized = value;
+    $("auth-state").textContent = value ? `已鉴权 · ${login}` : "只读模式";
+    $("auth-state").classList.toggle("ready", value);
+    $("auth-summary").textContent = value
+      ? `${login} · GitHub 已连接`
+      : "连接 GitHub 后才能操作";
+    $("run-now").innerHTML = value
+      ? "马上刷步 <span>→</span>"
+      : "鉴权后刷步 <span>→</span>";
+  }
+
+  async function verifyToken(token, quiet = false) {
+    try {
+      const login = await api.verifyPat(token);
+      api.savePat(token);
+      setAuthorized(true, login);
+      if (!quiet) showOps(`已通过 GitHub 鉴权：${login}`, true);
+      return token;
+    } catch (err) {
+      setAuthorized(false);
+      $("auth-details").open = true;
+      if (!quiet) showOps(String(err.message || err), false);
+      return "";
+    }
+  }
 
   function showOps(text, ok) {
     const el = $("ops-status");
@@ -274,18 +302,20 @@
     };
   }
 
-  function requirePat(action) {
+  async function requirePat(action) {
     const token = api.getPat();
     if (!token) {
       showOps(api.needPat(action).message, false);
+      $("auth-details").open = true;
+      patInput.focus();
       return "";
     }
-    api.savePat(token);
-    return token;
+    if (authorized && token === localStorage.getItem(api.PAT_KEY)) return token;
+    return verifyToken(token);
   }
 
   $("run-now").addEventListener("click", async () => {
-    const token = requirePat("马上刷步");
+    const token = await requirePat("马上刷步");
     if (!token) return;
     try {
       const { min, max } = stepInputs();
@@ -300,4 +330,7 @@
   });
 
   refresh();
+  const savedToken = localStorage.getItem(api.PAT_KEY) || "";
+  if (savedToken) verifyToken(savedToken, true);
+  else setAuthorized(false);
 })();
