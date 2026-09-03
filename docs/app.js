@@ -91,7 +91,7 @@
     card.className = "glance " + (ok ? "ok" : failed ? "bad" : "warn");
     $("status-text").textContent = ok ? "正常" : failed ? "失败" : "未知";
     $("status-detail").textContent = latest
-      ? `${latest.event === "schedule" ? "定时" : "手动"} · ${formatBJ(latest.updated_at || latest.created_at).slice(5)}`
+      ? (latest.event === "schedule" ? "定时" : "手动")
       : "还没有刷步记录";
 
     $("last-step").textContent = cron.lastStep ? cron.lastStep.toLocaleString("zh-CN") : "—";
@@ -100,7 +100,7 @@
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
 
-    $("last-sync").textContent = cron.lastSyncText ? cron.lastSyncText.slice(-8) : (latest ? formatBJ(latest.updated_at).slice(-5) : "—");
+    $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
 
     const now = beijingParts();
