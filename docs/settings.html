@@ -63,14 +63,14 @@
           <p>在仓库根目录执行 <code>npx wrangler login</code>，再执行 <code>npx wrangler deploy</code>。</p>
         </li>
         <li>
-          <strong>添加三个密钥</strong>
+          <strong>添加两个密钥</strong>
           <p>打开 <a href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare 控制台</a> → Workers &amp; Pages → <code>mimotion</code> → Settings → Variables and Secrets，添加：</p>
           <ul>
             <li><code>OWNER_PASSWORD</code> — 看板上输入的站长密码，你自己定</li>
-            <li><code>OWNER_USER</code> — 你的 Zepp Life 账号</li>
-            <li><code>OWNER_PWD</code> — 你的 Zepp Life 密码</li>
+            <li><code>PAT</code> — <strong>不用新申请</strong>。打开仓库 Settings → Secrets → Actions 里已有的 <code>PAT</code>，把同一个值复制到 Worker。Cloudflare 读不到 GitHub 密钥，所以必须复制一份。Zepp 账号仍走仓库 CONFIG。</li>
           </ul>
-          <p>命令行也可以：<code>npx wrangler secret put OWNER_PASSWORD</code>，另外两个同理。</p>
+          <p>命令行：<code>npx wrangler secret put OWNER_PASSWORD</code>，再 <code>npx wrangler secret put PAT</code>。</p>
+          <p><a href="https://github.com/Kedreamix/mimotion/settings/secrets/actions" target="_blank" rel="noreferrer">打开仓库 Secrets →</a></p>
         </li>
         <li>
           <strong>回看板刷步</strong>
