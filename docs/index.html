@@ -22,6 +22,7 @@
     </div>
     <nav class="nav" aria-label="页面">
       <a href="./" class="active">看板</a>
+      <a href="./dongdong.html">动动吧</a>
       <a href="./settings.html">参数</a>
     </nav>
     <div class="top-meta">
@@ -108,42 +109,16 @@
       <ol class="hour-row" id="timeline"></ol>
     </section>
 
-    <details class="panel guest-card">
-      <summary class="guest-summary">
+    <section class="panel guest-card">
+      <a class="guest-summary" href="./dongdong.html">
         <span class="guest-icon" aria-hidden="true">＋</span>
         <span>
-          <small>访客功能</small>
-          <strong>用自己的 Zepp Life 账号刷步</strong>
+          <small>一次性刷步</small>
+          <strong>动动吧 · 填账号密码更新一次步数</strong>
         </span>
-        <i>展开</i>
-      </summary>
-      <div class="guest-content">
-        <p class="muted">不会使用站长账号。密码仅用于本次请求，页面和 Worker 都不会保存。</p>
-        <div class="ops-grid">
-          <label class="field">Zepp Life 账号
-            <input id="guest-user" type="text" autocomplete="username" placeholder="手机号或邮箱" />
-          </label>
-          <label class="field">密码
-            <input id="guest-pwd" type="password" autocomplete="current-password" placeholder="只用于这一次" />
-          </label>
-        </div>
-        <details class="more">
-          <summary>自定义本次步数范围（可选）</summary>
-          <div class="ops-grid">
-            <label class="field">最小步数
-              <input id="guest-min" type="number" min="1000" step="1" placeholder="按当前时间估算" />
-            </label>
-            <label class="field">最大步数
-              <input id="guest-max" type="number" min="1000" step="1" placeholder="按当前时间估算" />
-            </label>
-          </div>
-        </details>
-        <div class="quick-row">
-          <button id="guest-run" class="guest-run-button" type="button">游客刷步 <span>→</span></button>
-        </div>
-        <p id="guest-status" class="banner" hidden></p>
-      </div>
-    </details>
+        <i>去刷步</i>
+      </a>
+    </section>
 
     <section class="panel slim history-card">
       <div class="panel-head">

@@ -3,7 +3,7 @@ import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
-import { applyBandTemplate, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
+import { applyBandTemplate, clampStep, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
 
 const PYTHON_PLAIN = "emailOrPhone=%2B8613800138000&password=secret&state=REDIRECTION&client_id=HuaMi&country_code=CN&token=access&redirect_uri=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fhm-registration%2Fsuccesssignin.html";
@@ -38,6 +38,13 @@ test("normalize phone and mask user", () => {
   assert.equal(normalizeUser("13800138000"), "+8613800138000");
   assert.equal(normalizeUser("a@b.com"), "a@b.com");
   assert.equal(maskUser("+8613800138000"), "+86****8000");
+});
+
+test("clampStep stays within 1 and 98800", () => {
+  assert.equal(clampStep(54188), 54188);
+  assert.equal(clampStep(0), 1);
+  assert.equal(clampStep(999999), 98800);
+  assert.equal(clampStep("nope"), null);
 });
 
 test("time scaled step range grows toward evening", () => {
@@ -141,6 +148,37 @@ test("guest handler mocked login and sync does not persist password", async () =
   assert.equal(payload.body.step, 12000);
   assert.equal(payload.body.user.includes("guest-secret"), false);
   assert.equal(JSON.stringify(payload.body).includes("guest-secret"), false);
+});
+
+test("guest handler accepts an exact step", async () => {
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
+  const res = await handleRequest(new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "guest-exact" },
+    body: JSON.stringify({ user: "13800138000", password: "guest-secret", step: 98800 }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }, fetchImpl);
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.step, 98800);
 });
 
 test("safeEqual rejects mismatched passwords", () => {
