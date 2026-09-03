@@ -172,7 +172,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
       if (!env.OWNER_PASSWORD) {
         return json({
           ok: false,
-          error: "站长刷步还没配置 Worker 密钥。请添加 OWNER_PASSWORD，不要写进 GitHub 参数。",
+          error: "站长刷步还没配置完成。",
         }, 503, origin, env);
       }
       if (!safeEqual(body.password, env.OWNER_PASSWORD)) {
@@ -182,7 +182,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
       if (!pat) {
         return json({
           ok: false,
-          error: "还没把仓库里的 PAT 放到 Worker。不用新申请：把 GitHub Secrets 里已有的 PAT 复制到 Cloudflare（Secret 名用 PAT 即可）。Worker 读不到 GitHub 密钥。",
+          error: "刷步接口还没配置完成。",
         }, 503, origin, env);
       }
       const repo = env.OWNER_REPO || "Kedreamix/mimotion";

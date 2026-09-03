@@ -216,7 +216,7 @@ test("owner-run returns 503 when PAT is missing after password check", async () 
   const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-pat"), ownerEnv());
   const payload = await read(res);
   assert.equal(payload.status, 503);
-  assert.match(payload.body.error, /PAT/);
+  assert.match(payload.body.error, /配置完成/);
 });
 
 test("owner-run triggers workflow_dispatch via GitHub API", async () => {
