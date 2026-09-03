@@ -101,28 +101,18 @@
       <div class="action-copy">
         <div class="action-heading">
           <p class="eyebrow">OWNER</p>
-          <span id="auth-state" class="auth-badge">未连接</span>
+          <span class="auth-badge">站长</span>
         </div>
         <h2>刷我的账号</h2>
-        <p id="account-ready" class="muted">点登录会跳到 GitHub，回来不用填 token</p>
+        <p id="account-ready" class="muted">输入站长密码即可，不用 GitHub</p>
       </div>
+      <label class="field">站长密码
+        <input id="owner-pwd" type="password" autocomplete="current-password" placeholder="Worker 里配置的密码" />
+      </label>
       <div class="quick-row">
-        <button id="github-login" class="primary run-button" type="button">用 GitHub 登录 <span>→</span></button>
-        <button id="run-now" type="button">马上刷步</button>
+        <button id="run-now" class="primary run-button" type="button">马上刷步 <span>→</span></button>
         <a href="./settings.html">改参数</a>
       </div>
-      <details class="more" id="pat-details">
-        <summary>改用粘贴 PAT</summary>
-        <label class="field">GitHub PAT
-          <input id="pat" type="password" autocomplete="off" placeholder="github_pat_、ghp_ 或 gho_" />
-        </label>
-        <p class="auth-help">只保存在这个浏览器。Fine-grained token 勾选本仓库，并给 Actions 读写。
-          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">去创建</a>
-        </p>
-        <div class="quick-row">
-          <button id="connect-github" type="button">用 PAT 连接</button>
-        </div>
-      </details>
       <p id="ops-status" class="banner" hidden></p>
     </section>
 

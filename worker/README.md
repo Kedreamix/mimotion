@@ -1,21 +1,20 @@
 # mimotion-guest
 
-游客刷步，以及看板「用 GitHub 登录」的换票。正式看板在 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。
-
-`ALLOWED_ORIGINS` 写成看板地址即可，例如 `https://kedreamix.github.io/mimotion`。
-
-GitHub 登录需要两个 Secret：
+游客刷步，以及站长用独立密码刷自己的账号。正式看板在 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。
 
 ```bash
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler deploy
+npx wrangler secret put OWNER_PASSWORD
+npx wrangler secret put OWNER_USER
+npx wrangler secret put OWNER_PWD
 ```
 
-OAuth 回调必须是 `https://kedreamix.github.io/mimotion/`。
+`OWNER_PASSWORD` 是看板上的站长密码，不要写进仓库。`OWNER_USER` / `OWNER_PWD` 是你的 Zepp Life 账号。
+
+`ALLOWED_ORIGINS` 写成看板地址即可，例如 `https://kedreamix.github.io/mimotion`。
 
 本地：
 
 ```bash
-GITHUB_CLIENT_ID=xxx GITHUB_CLIENT_SECRET=yyy OAUTH_REDIRECT_URI=http://127.0.0.1:8765/ node worker/dev-server.mjs
+OWNER_PASSWORD=demo OWNER_USER=13800138000 OWNER_PWD=secret node worker/dev-server.mjs
 ```
