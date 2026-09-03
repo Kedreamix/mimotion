@@ -237,10 +237,23 @@
 
 参数页会明确区分两类能力：
 
-- **可以直接操作**：步数、整点、间隔等 Variables，以及使用仓库现有账号执行「马上刷步」。
-- **不能从公开页直接操作**：账号、密码和推送 Token。它们不能作为 `workflow_dispatch` 输入传递，否则可能留下敏感记录。请在参数页生成完整 CONFIG，复制到 GitHub Secret 后，再执行「马上刷步」验证。
+- **游客刷步**：填写自己的 Zepp Life 账号，走 Cloudflare Worker，不动仓库账号。
+- **站长操作要鉴权**：改 Variables、刷仓库里保存的账号，需要 GitHub PAT。
+- **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
 
-看板默认是**只读模式**。访客可以看公开状态，但所有写操作都要先用 GitHub PAT 鉴权；页面会向 GitHub 验证 token，只有具备该仓库 `Actions: Read and write` 权限的账号才能真正触发刷步。PAT 只保存在当前浏览器的 `localStorage`。
+看板默认是**只读模式**。访客可以看公开状态，也可以用**自己的** Zepp Life 账号走游客刷步；改仓库参数、刷仓库里保存的账号，必须先用 GitHub PAT 鉴权。PAT 只保存在当前浏览器的 `localStorage`。
+
+#### 游客刷步（Cloudflare Worker）
+
+游客表单提交到独立 Worker，**不会触发**仓库 `run.yml`，也**不会读取** Secret `CONFIG`。
+
+- 密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
+- 按 IP 限流（10 分钟 5 次）。
+- 本地验证：`node worker/dev-server.mjs`，看板会请求 `http://127.0.0.1:8787/guest-run`。
+- 上线：在 Cloudflare 绑定本仓库 `worker/` 后执行 `npx wrangler deploy`，Worker 名默认 `mimotion-guest`。把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`（若账号子域不是 `kedreamix`）。
+- Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
+
+没有部署 Worker 时，游客按钮会提示接口不可用，站长刷步不受影响。
 
 参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
 
@@ -252,7 +265,8 @@
 
 看板和参数页还接了这些接口：
 
-- **马上刷步**：看板和参数页都可以触发 `刷步数`。可带上这一次的最小/最大步数，不改默认值。
+- **游客刷步**：看板公开入口，使用访客自己的账号。
+- **刷仓库账号**：看板「刷仓库里的账号」，需要 GitHub 鉴权后才触发 `刷步数`。
 - **保存变量 / 保存并刷步**：在参数页写入 Variables。
 - **应用新定时**：参数页「其它工作流」，触发 `Random Cron`。
 - **刷新看板**：参数页「其它工作流」，重新发布 GitHub Pages 快照。

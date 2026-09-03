@@ -175,6 +175,15 @@ dd.muted { font-size: 12px; margin-top: 3px; }
 .hour-row li.next { border-color: rgba(255, 90, 31, 0.55); background: rgba(255, 90, 31, 0.08); }
 .hour-row li.miss { opacity: 0.55; }
 
+.guest-card {
+  padding: 16px 18px 14px;
+  margin-bottom: 12px;
+  background:
+    linear-gradient(120deg, rgba(61, 214, 140, 0.08), transparent 42%),
+    var(--card);
+}
+.guest-card h2 { margin: 4px 0 6px; font-size: 17px; }
+
 .action-card {
   display: grid;
   grid-template-columns: 1fr auto;

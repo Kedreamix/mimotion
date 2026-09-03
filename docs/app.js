@@ -100,8 +100,8 @@
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
     $("account-ready").textContent = cron.accountCount
-      ? `使用仓库中已保存的 ${cron.accountCount} 个账号`
-      : "使用仓库中已保存的账号与密码";
+      ? `仓库里有 ${cron.accountCount} 个站长账号，刷它们需要 GitHub 鉴权`
+      : "刷仓库账号需要 GitHub 鉴权";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -323,9 +323,56 @@
       if (min) inputs.min_step = min;
       if (max) inputs.max_step = max;
       await api.dispatchWorkflow(token, "run.yml", inputs);
-      showOps("已触发马上刷步。", true);
+      showOps("已触发仓库账号刷步。", true);
     } catch (err) {
       showOps(String(err.message || err), false);
+    }
+  });
+
+  function showGuest(text, ok) {
+    const el = $("guest-status");
+    el.hidden = false;
+    el.className = "banner " + (ok ? "ok" : "bad");
+    el.textContent = text;
+  }
+
+  $("guest-run").addEventListener("click", async () => {
+    const user = ($("guest-user").value || "").trim();
+    const password = $("guest-pwd").value || "";
+    if (!user || !password) {
+      showGuest("请填写你自己的 Zepp Life 账号和密码。", false);
+      return;
+    }
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) {
+      showGuest("游客接口还没部署。", false);
+      return;
+    }
+    const payload = { user, password };
+    const min = ($("guest-min").value || "").trim();
+    const max = ($("guest-max").value || "").trim();
+    if (min) payload.min_step = Number(min);
+    if (max) payload.max_step = Number(max);
+    $("guest-run").disabled = true;
+    showGuest("正在提交到游客接口，不会写入仓库。", true);
+    try {
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      $("guest-pwd").value = "";
+      if (!res.ok || !body.ok) {
+        showGuest(body.error || `游客刷步失败（${res.status}）`, false);
+        return;
+      }
+      showGuest(body.message || `已同步 ${body.step} 步`, true);
+    } catch (err) {
+      $("guest-pwd").value = "";
+      showGuest(String(err.message || err) + "。如果是本地预览，请先启动 worker/dev-server.mjs。", false);
+    } finally {
+      $("guest-run").disabled = false;
     }
   });
 

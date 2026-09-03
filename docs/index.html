@@ -65,17 +65,49 @@
       <ol class="hour-row" id="timeline"></ol>
     </section>
 
+    <section class="panel guest-card">
+      <div class="action-heading">
+        <p class="eyebrow">GUEST</p>
+        <span class="auth-badge ready">游客</span>
+      </div>
+      <h2>用自己的账号刷步</h2>
+      <p class="muted">不会使用仓库里的账号。密码只用于这一次请求，页面和 Worker 都不会保存。</p>
+      <div class="ops-grid">
+        <label class="field">Zepp Life 账号
+          <input id="guest-user" type="text" autocomplete="username" placeholder="手机号或邮箱" />
+        </label>
+        <label class="field">密码
+          <input id="guest-pwd" type="password" autocomplete="current-password" placeholder="只用于这一次" />
+        </label>
+      </div>
+      <details class="more">
+        <summary>本次步数范围（可选）</summary>
+        <div class="ops-grid">
+          <label class="field">最小步数
+            <input id="guest-min" type="number" min="1000" step="1" placeholder="按当前时间估算" />
+          </label>
+          <label class="field">最大步数
+            <input id="guest-max" type="number" min="1000" step="1" placeholder="按当前时间估算" />
+          </label>
+        </div>
+      </details>
+      <div class="quick-row">
+        <button id="guest-run" class="primary run-button" type="button">游客刷步 <span>→</span></button>
+      </div>
+      <p id="guest-status" class="banner" hidden></p>
+    </section>
+
     <section class="panel action-card">
       <div class="action-copy">
         <div class="action-heading">
           <p class="eyebrow">QUICK ACTION</p>
           <span id="auth-state" class="auth-badge">只读模式</span>
         </div>
-        <h2>立即执行一次</h2>
-        <p id="account-ready" class="muted">使用仓库中已保存的账号</p>
+        <h2>刷仓库里的账号</h2>
+        <p id="account-ready" class="muted">这是站长账号，需要 GitHub 鉴权</p>
       </div>
       <div class="quick-row">
-        <button id="run-now" class="primary run-button" type="button">马上刷步 <span>→</span></button>
+        <button id="run-now" class="primary run-button" type="button">鉴权后刷步 <span>→</span></button>
         <a href="./settings.html">设置</a>
       </div>
       <p id="ops-status" class="banner" hidden></p>
@@ -113,6 +145,7 @@
     </p>
   </footer>
   <script src="./schedule.js"></script>
+  <script src="./guest-config.js"></script>
   <script src="./api.js"></script>
   <script src="./app.js"></script>
 </body>
