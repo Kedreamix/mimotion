@@ -90,9 +90,6 @@
       ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${stepGoal.toLocaleString("zh-CN")}`
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
-    $("account-ready").textContent = cron.accountCount
-      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。这里输入站长密码可立刻刷一次。`
-      : "输入站长密码即可立刻刷一次，不用 GitHub。";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
