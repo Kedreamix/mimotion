@@ -93,8 +93,19 @@ test("guest handler CORS preflight", async () => {
   const res = await handleRequest(new Request("https://guest.test/guest-run", {
     method: "OPTIONS",
     headers: { Origin: "https://kedreamix.github.io" },
-  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" });
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io/mimotion" });
   assert.equal(res.status, 204);
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://kedreamix.github.io");
+});
+
+test("guest handler allows Pages origin when allowlist uses the full board URL", async () => {
+  const res = await handleRequest(new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json" },
+    body: JSON.stringify({ user: "", password: "" }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io/mimotion" });
+  const payload = await read(res);
+  assert.equal(payload.status, 400);
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://kedreamix.github.io");
 });
 

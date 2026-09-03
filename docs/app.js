@@ -91,8 +91,8 @@
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
     $("account-ready").textContent = cron.accountCount
-      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。这里输入站长密码可立刻刷一次。`
-      : "输入站长密码即可立刻刷一次，不用 GitHub。";
+      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。这里用 GitHub PAT 可立刻刷一次。`
+      : "输入 GitHub PAT 即可立刻刷一次。";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -247,6 +247,10 @@
   tick();
   setInterval(tick, 1000);
 
+  const api = window.MimoApi;
+  const patInput = $("pat");
+  if (patInput) patInput.value = localStorage.getItem(api.PAT_KEY) || "";
+
   function showOps(text, ok) {
     const el = $("ops-status");
     el.hidden = false;
@@ -255,35 +259,20 @@
   }
 
   $("run-now").addEventListener("click", async () => {
-    const password = ($("owner-pwd").value || "").trim();
-    if (!password) {
-      showOps("请输入站长密码。", false);
-      $("owner-pwd").focus();
+    const token = (patInput && patInput.value.trim()) || api.getPat();
+    if (!token) {
+      showOps("请输入 GitHub PAT。看板地址是 https://kedreamix.github.io/mimotion/", false);
+      if (patInput) patInput.focus();
       return;
     }
-    const endpoint = window.MIMO_GUEST_API;
-    if (!endpoint) {
-      showOps("刷步接口还没部署。", false);
-      return;
-    }
+    api.savePat(token);
     $("run-now").disabled = true;
-    showOps("正在用站长密码刷步，不会走 GitHub。", true);
+    showOps("正在通过 GitHub 触发仓库刷步…", true);
     try {
-      const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-run`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      const body = await res.json().catch(() => ({}));
-      $("owner-pwd").value = "";
-      if (!res.ok || !body.ok) {
-        showOps(body.error || `刷步失败（${res.status}）`, false);
-        return;
-      }
-      showOps(body.message || `已同步 ${body.step} 步`, true);
+      await api.dispatchWorkflow(token, "run.yml", {});
+      showOps("已触发仓库账号刷步。", true);
     } catch (err) {
-      $("owner-pwd").value = "";
-      showOps(String(err.message || err) + "。本地预览请先启动 worker/dev-server.mjs。", false);
+      showOps(String(err.message || err), false);
     } finally {
       $("run-now").disabled = false;
     }

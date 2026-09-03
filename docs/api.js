@@ -96,7 +96,7 @@ window.MimoApi = (() => {
   }
 
   function needPat(action) {
-    return new Error(`还没有 PAT，无法${action}。Fine-grained 需要 Actions 读写（应用定时 / 刷新看板）和 Variables 读写（保存设置）。`);
+    return new Error(`还没有 PAT，无法${action}。Fine-grained 需要 Actions 读写（马上刷步 / 应用定时 / 刷新看板）和 Variables 读写（保存设置）。`);
   }
 
   return {

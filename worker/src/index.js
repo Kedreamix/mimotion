@@ -5,16 +5,34 @@ import { guestSync } from "./zepp.js";
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 5, windowMs: 10 * 60 * 1000 });
 
+const DEFAULT_PAGES_ORIGIN = "https://kedreamix.github.io/mimotion";
+
 function allowedOrigins(env) {
-  return String(env.ALLOWED_ORIGINS || "https://kedreamix.github.io")
+  return String(env.ALLOWED_ORIGINS || DEFAULT_PAGES_ORIGIN)
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
+function originKey(value) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+}
+
+function isAllowedOrigin(origin, env) {
+  if (!origin) return true;
+  const key = originKey(origin);
+  return allowedOrigins(env).some((item) => originKey(item) === key);
+}
+
 function corsHeaders(origin, env) {
   const allow = allowedOrigins(env);
-  const matched = allow.includes(origin) ? origin : allow[0];
+  const matched = isAllowedOrigin(origin, env) && origin
+    ? origin
+    : (originKey(allow[0]) || allow[0] || "");
   return {
     "Access-Control-Allow-Origin": matched,
     "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
@@ -64,8 +82,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
   if (!isGuest && !isOwner) {
     return json({ ok: false, error: "找不到接口" }, 404, origin, env);
   }
-  const allow = allowedOrigins(env);
-  if (origin && !allow.includes(origin)) {
+  if (!isAllowedOrigin(origin, env)) {
     return json({ ok: false, error: "来源不被允许" }, 403, origin, env);
   }
   const limited = limiter(`${isOwner ? "owner" : "guest"}:${clientKey(request)}`);
