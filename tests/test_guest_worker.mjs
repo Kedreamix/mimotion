@@ -243,3 +243,51 @@ test("owner-run uses OWNER_USER/OWNER_PWD instead of body credentials", async ()
   assert.match(plain, /password=owner-zepp/);
   assert.equal(plain.includes("attacker"), false);
 });
+
+const oauthEnv = {
+  ALLOWED_ORIGINS: "https://kedreamix.github.io/mimotion",
+  GITHUB_CLIENT_ID: "client123",
+  GITHUB_CLIENT_SECRET: "super-secret",
+  OAUTH_REDIRECT_URI: "https://kedreamix.github.io/mimotion/",
+};
+
+test("oauth login redirects to GitHub authorize", async () => {
+  const res = await handleRequest(new Request("https://guest.test/oauth/login?state=abc"), oauthEnv);
+  assert.equal(res.status, 302);
+  const location = res.headers.get("Location");
+  assert.match(location, /github\.com\/login\/oauth\/authorize/);
+  assert.match(location, /client_id=client123/);
+  assert.match(location, /state=abc/);
+  assert.match(location, /kedreamix\.github\.io/);
+});
+
+test("oauth token returns 503 when oauth is not configured", async () => {
+  const res = await handleRequest(new Request("https://guest.test/oauth/token", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "ip-oauth-503" },
+    body: JSON.stringify({ code: "x", redirect_uri: "https://kedreamix.github.io/mimotion/" }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io/mimotion" });
+  const payload = await read(res);
+  assert.equal(payload.status, 503);
+});
+
+test("oauth token exchanges code and does not leak client secret", async () => {
+  const fetchImpl = async (url, options = {}) => {
+    assert.match(String(url), /login\/oauth\/access_token/);
+    const sent = JSON.parse(options.body);
+    assert.equal(sent.client_id, "client123");
+    assert.equal(sent.client_secret, "super-secret");
+    return new Response(JSON.stringify({ access_token: "gho_test_token", token_type: "bearer" }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
+  const res = await handleRequest(new Request("https://guest.test/oauth/token", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "ip-oauth-ok" },
+    body: JSON.stringify({ code: "code-1", redirect_uri: "https://kedreamix.github.io/mimotion/" }),
+  }), oauthEnv, fetchImpl);
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.token, "gho_test_token");
+  assert.equal(JSON.stringify(payload.body).includes("super-secret"), false);
+});

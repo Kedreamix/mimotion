@@ -8,6 +8,9 @@ const env = {
   OWNER_PASSWORD: process.env.OWNER_PASSWORD || "",
   OWNER_USER: process.env.OWNER_USER || "",
   OWNER_PWD: process.env.OWNER_PWD || "",
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
+  OAUTH_REDIRECT_URI: process.env.OAUTH_REDIRECT_URI || "http://127.0.0.1:8765/",
 };
 
 createServer(async (req, res) => {

@@ -1,4 +1,5 @@
 import { clientKey, createLimiter } from "./rate-limit.js";
+import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
 import { guestSync } from "./zepp.js";
 
@@ -77,15 +78,33 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
     return json({ ok: true, service: "mimotion-guest" }, 200, origin, env);
   }
   const path = url.pathname.replace(/\/$/, "") || "/";
+  if (request.method === "GET" && path === "/oauth/config") {
+    return json({
+      ok: true,
+      configured: oauthConfigured(env),
+      redirectUri: pagesRedirectUri(env),
+    }, 200, origin, env);
+  }
+  if (request.method === "GET" && path === "/oauth/login") {
+    const state = url.searchParams.get("state") || "";
+    if (!state) {
+      return json({ ok: false, error: "缺少登录状态" }, 400, origin, env);
+    }
+    if (!oauthConfigured(env)) {
+      return json({ ok: false, error: "还没配置 GitHub OAuth" }, 503, origin, env);
+    }
+    return Response.redirect(githubAuthorizeUrl(env, state), 302);
+  }
+  const isOauthToken = request.method === "POST" && path === "/oauth/token";
   const isGuest = request.method === "POST" && (path === "/" || path === "/guest-run");
   const isOwner = request.method === "POST" && path === "/owner-run";
-  if (!isGuest && !isOwner) {
+  if (!isGuest && !isOwner && !isOauthToken) {
     return json({ ok: false, error: "找不到接口" }, 404, origin, env);
   }
   if (!isAllowedOrigin(origin, env)) {
     return json({ ok: false, error: "来源不被允许" }, 403, origin, env);
   }
-  const limited = limiter(`${isOwner ? "owner" : "guest"}:${clientKey(request)}`);
+  const limited = limiter(`${isOwner ? "owner" : isOauthToken ? "oauth" : "guest"}:${clientKey(request)}`);
   if (!limited.ok) {
     return json({ ok: false, error: "请求太频繁，请稍后再试" }, 429, origin, env);
   }
@@ -94,6 +113,21 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
     body = await parseBody(request);
   } catch {
     return json({ ok: false, error: "请求格式不正确" }, 400, origin, env);
+  }
+  if (isOauthToken) {
+    try {
+      const result = await exchangeGithubCode({
+        env,
+        code: body.code,
+        redirectUri: body.redirect_uri,
+        fetchImpl,
+      });
+      return json({ ok: true, token: result.token }, 200, origin, env);
+    } catch (err) {
+      const message = String(err.message || err);
+      const status = message.includes("还没配置") ? 503 : 400;
+      return json({ ok: false, error: message }, status, origin, env);
+    }
   }
   try {
     let result;

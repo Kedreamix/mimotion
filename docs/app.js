@@ -91,8 +91,8 @@
       : "暂无步数记录";
     setBar(cron.lastStep || 0);
     $("account-ready").textContent = cron.accountCount
-      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。连接 GitHub 后可立刻刷一次。`
-      : "连接 GitHub 后可立刻刷一次。";
+      ? `定时任务会刷仓库里的 ${cron.accountCount} 个账号。登录 GitHub 后可立刻刷一次。`
+      : "登录 GitHub 后可立刻刷一次。";
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -259,7 +259,9 @@
     const badge = $("auth-state");
     badge.textContent = value ? `已鉴权 · ${login}` : "未连接";
     badge.classList.toggle("ready", value);
-    $("run-now").innerHTML = value ? "马上刷步 <span>→</span>" : "鉴权后刷步 <span>→</span>";
+    $("run-now").innerHTML = value ? "马上刷步 <span>→</span>" : "登录后刷步 <span>→</span>";
+    const loginBtn = $("github-login");
+    if (loginBtn) loginBtn.innerHTML = value ? "重新登录 GitHub" : "用 GitHub 登录 <span>→</span>";
   }
 
   function showOps(text, ok) {
@@ -295,13 +297,91 @@
   async function requirePat(action) {
     const token = api.getPat();
     if (!token) {
-      showOps(api.needPat(action).message, false);
-      if (patInput) patInput.focus();
+      showOps("请先点「用 GitHub 登录」，或展开粘贴 PAT。", false);
       return "";
     }
     if (authorized && token === authorizedToken) return token;
     return connectGitHub();
   }
+
+  function oauthRedirectUri() {
+    return window.MIMO_PAGES_URL || `${location.origin}${location.pathname.replace(/[^/]+$/, "")}`;
+  }
+
+  async function startGitHubLogin() {
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) {
+      showOps("跳转登录需要先部署 Worker 换票。也可以展开粘贴 PAT。", false);
+      const details = $("pat-details");
+      if (details) details.open = true;
+      return;
+    }
+    try {
+      const cfgRes = await fetch(`${endpoint.replace(/\/$/, "")}/oauth/config`);
+      const cfg = await cfgRes.json().catch(() => ({}));
+      if (!cfg.configured) {
+        showOps("还没配置 GitHub OAuth。在 Worker 里放入 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET。也可以展开粘贴 PAT。", false);
+        const details = $("pat-details");
+        if (details) details.open = true;
+        return;
+      }
+    } catch {
+      showOps("登录接口连不上。也可以展开粘贴 PAT。", false);
+      const details = $("pat-details");
+      if (details) details.open = true;
+      return;
+    }
+    const state = crypto.randomUUID();
+    sessionStorage.setItem("mimotion.oauth_state", state);
+    location.href = `${endpoint.replace(/\/$/, "")}/oauth/login?state=${encodeURIComponent(state)}`;
+  }
+
+  async function completeOAuthIfNeeded() {
+    const params = new URLSearchParams(location.search);
+    if (params.get("error")) {
+      showOps(params.get("error_description") || "GitHub 登录已取消。", false);
+      history.replaceState({}, "", `${location.pathname}${location.hash || ""}`);
+      return false;
+    }
+    const code = params.get("code");
+    if (!code) return false;
+    const state = params.get("state") || "";
+    const expected = sessionStorage.getItem("mimotion.oauth_state") || "";
+    history.replaceState({}, "", `${location.pathname}${location.hash || ""}`);
+    if (!expected || state !== expected) {
+      showOps("登录已过期，请再点一次「用 GitHub 登录」。", false);
+      return true;
+    }
+    sessionStorage.removeItem("mimotion.oauth_state");
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) {
+      showOps("已从 GitHub 返回，但换票接口还没部署。", false);
+      return true;
+    }
+    showOps("正在完成 GitHub 登录…", true);
+    try {
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code, redirect_uri: oauthRedirectUri() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.token) {
+        showOps(body.error || "GitHub 登录失败", false);
+        return true;
+      }
+      if (patInput) patInput.value = body.token;
+      api.savePat(body.token);
+      await connectGitHub();
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    }
+    return true;
+  }
+
+  $("github-login").addEventListener("click", () => {
+    startGitHubLogin();
+  });
 
   $("connect-github").addEventListener("click", () => {
     connectGitHub();
@@ -371,5 +451,7 @@
 
   refresh();
   setAuthorized(false);
-  if (localStorage.getItem(api.PAT_KEY)) connectGitHub(true);
+  completeOAuthIfNeeded().then((handled) => {
+    if (!handled && localStorage.getItem(api.PAT_KEY)) connectGitHub(true);
+  });
 })();

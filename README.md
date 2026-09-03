@@ -238,11 +238,30 @@
 参数页会明确区分两类能力：
 
 - **游客刷步**：本地或已部署的 Worker 上，填写自己的 Zepp Life 账号，不动仓库账号。
-- **站长马上刷步**：打开 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)，用 GitHub PAT 触发仓库 `刷步数`。
+- **站长马上刷步**：打开 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)，点「用 GitHub 登录」跳到 GitHub，回来后直接刷步。也可以展开粘贴 PAT。
 - **改仓库变量也要 PAT**：参数页写入 Variables、应用定时仍走 GitHub。
 - **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
 
-看板默认是**只读模式**。访客可以看公开状态。你自己立刻刷步：在 [看板](https://kedreamix.github.io/mimotion/) 点「连接 GitHub」，PAT 只保存在当前浏览器。
+看板默认是**只读模式**。访客可以看公开状态。你自己立刻刷步：在 [看板](https://kedreamix.github.io/mimotion/) 点「用 GitHub 登录」，会跳到 GitHub 授权后回到看板，不用手填 token。
+
+#### 用 GitHub 登录（不用粘贴 PAT）
+
+公开 Pages 不能保管 OAuth Client Secret，所以换票走 Worker，看板地址仍是 `https://kedreamix.github.io/mimotion/`。
+
+1. 打开 [GitHub OAuth Apps](https://github.com/settings/developers) 新建应用。
+2. Homepage：`https://kedreamix.github.io/mimotion/`
+3. Authorization callback URL：`https://kedreamix.github.io/mimotion/`（本地调试再加一条 `http://127.0.0.1:8765/`）
+4. 把 Client ID / Client Secret 写入 Worker：
+
+```bash
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler deploy
+```
+
+5. 把 `docs/guest-config.js` 里生产环境的 `MIMO_GUEST_API` 改成 wrangler 打印的 `*.workers.dev` 地址。
+
+OAuth 权限是 `public_repo`，用来触发公开仓库的 `刷步数`。没配 OAuth 时，仍可展开「改用粘贴 PAT」。
 
 #### 游客刷步（Cloudflare Worker，可选）
 
@@ -254,7 +273,7 @@
 - 允许的来源按看板地址匹配：`https://kedreamix.github.io/mimotion/`（浏览器 Origin 不含路径，Worker 会按站点 origin 放行）。
 - Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
 
-没有部署 Worker 时，游客按钮会提示接口不可用。站长马上刷步走 GitHub，不受影响。
+没有部署 Worker 时，游客刷步和「用 GitHub 登录」会提示接口不可用。仍可展开粘贴 PAT 马上刷步。
 
 参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
 
@@ -267,7 +286,7 @@
 看板和参数页还接了这些接口：
 
 - **游客刷步**：可选，使用访客自己的账号（需本地或已部署的 Worker）。
-- **站长马上刷步**：看板用 GitHub PAT 触发仓库 `刷步数`，地址是 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。
+- **站长马上刷步**：看板「用 GitHub 登录」跳转授权，或粘贴 PAT，地址是 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。
 - **保存变量**：参数页写入 Variables，仍需要 GitHub PAT。
 - **应用新定时**：参数页「其它工作流」，触发 `Random Cron`。
 - **刷新看板**：参数页「其它工作流」，重新发布 GitHub Pages 快照。

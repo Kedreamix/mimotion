@@ -1,11 +1,21 @@
 # mimotion-guest
 
-可选的游客刷步接口。正式看板在 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)，站长马上刷步走 GitHub PAT，不依赖这个 Worker。
+游客刷步，以及看板「用 GitHub 登录」的换票。正式看板在 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。
 
-`ALLOWED_ORIGINS` 写成看板地址即可，例如 `https://kedreamix.github.io/mimotion`。浏览器 Origin 不含路径，Worker 会按站点 origin 放行。
+`ALLOWED_ORIGINS` 写成看板地址即可，例如 `https://kedreamix.github.io/mimotion`。
+
+GitHub 登录需要两个 Secret：
+
+```bash
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler deploy
+```
+
+OAuth 回调必须是 `https://kedreamix.github.io/mimotion/`。
 
 本地：
 
 ```bash
-node worker/dev-server.mjs
+GITHUB_CLIENT_ID=xxx GITHUB_CLIENT_SECRET=yyy OAUTH_REDIRECT_URI=http://127.0.0.1:8765/ node worker/dev-server.mjs
 ```
