@@ -169,6 +169,26 @@ function ownerRequest(body, ip = "owner-test") {
   });
 }
 
+test("owner-status reports whether worker secrets are configured", async () => {
+  const missing = await read(await handleRequest(new Request("https://guest.test/owner-status", {
+    headers: { Origin: "https://kedreamix.github.io" },
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }));
+  assert.equal(missing.status, 200);
+  assert.equal(missing.body.configured, false);
+  assert.equal(missing.body.hasPassword, false);
+  assert.equal(missing.body.hasAccount, false);
+
+  const ready = await read(await handleRequest(new Request("https://guest.test/owner-status", {
+    headers: { Origin: "https://kedreamix.github.io" },
+  }), ownerEnv({ OWNER_USER: "17600000000", OWNER_PWD: "owner-zepp" })));
+  assert.equal(ready.status, 200);
+  assert.equal(ready.body.configured, true);
+  assert.equal(ready.body.hasPassword, true);
+  assert.equal(ready.body.hasAccount, true);
+  assert.equal(JSON.stringify(ready.body).includes("secret"), false);
+  assert.equal(JSON.stringify(ready.body).includes("owner-zepp"), false);
+});
+
 test("owner-run returns 503 when owner password secret is missing", async () => {
   const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-missing"), {
     ALLOWED_ORIGINS: "https://kedreamix.github.io",

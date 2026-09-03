@@ -253,6 +253,7 @@
 - 游客密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
 - 按 IP 限流（10 分钟 5 次）。
 - 本地验证：`OWNER_PASSWORD=demo OWNER_USER=13800138000 OWNER_PWD=secret node worker/dev-server.mjs`
+- **不要**把 `OWNER_PASSWORD` 写成 GitHub Variables / `params.json`。公开仓库里谁都能看到。
 - 上线：
 
 ```bash

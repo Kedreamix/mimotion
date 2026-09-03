@@ -68,16 +68,25 @@ async function runSync(user, password, body, fetchImpl) {
   });
 }
 
+function ownerSecretStatus(env) {
+  const hasPassword = Boolean(env.OWNER_PASSWORD);
+  const hasAccount = Boolean(env.OWNER_USER && env.OWNER_PWD);
+  return { hasPassword, hasAccount, configured: hasPassword && hasAccount };
+}
+
 export async function handleRequest(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get("Origin") || "";
   const url = new URL(request.url);
+  const path = url.pathname.replace(/\/$/, "") || "/";
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
   }
-  if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
+  if (request.method === "GET" && (path === "/" || path === "/health")) {
     return json({ ok: true, service: "mimotion-guest" }, 200, origin, env);
   }
-  const path = url.pathname.replace(/\/$/, "") || "/";
+  if (request.method === "GET" && path === "/owner-status") {
+    return json({ ok: true, ...ownerSecretStatus(env) }, 200, origin, env);
+  }
   if (request.method === "GET" && path === "/oauth/config") {
     return json({
       ok: true,
@@ -133,13 +142,19 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
     let result;
     if (isOwner) {
       if (!env.OWNER_PASSWORD) {
-        return json({ ok: false, error: "站长刷步还没配置 Worker 密钥" }, 503, origin, env);
+        return json({
+          ok: false,
+          error: "站长刷步还没配置 Worker 密钥。请添加 OWNER_PASSWORD，不要写进 GitHub 参数。",
+        }, 503, origin, env);
       }
       if (!safeEqual(body.password, env.OWNER_PASSWORD)) {
         return json({ ok: false, error: "站长密码不对" }, 401, origin, env);
       }
       if (!env.OWNER_USER || !env.OWNER_PWD) {
-        return json({ ok: false, error: "站长刷步还没配置 Worker 密钥" }, 503, origin, env);
+        return json({
+          ok: false,
+          error: "站长刷步还没配置 Worker 密钥。请添加 OWNER_USER 和 OWNER_PWD。",
+        }, 503, origin, env);
       }
       result = await runSync(env.OWNER_USER, env.OWNER_PWD, body, fetchImpl);
     } else {
