@@ -66,8 +66,8 @@
           <strong>添加两个密钥</strong>
           <p>打开 <a href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare 控制台</a> → Workers &amp; Pages → <code>mimotion</code> → Settings → Variables and Secrets，添加：</p>
           <ul>
-            <li><code>OWNER_PASSWORD</code> — 看板上输入的站长密码，你自己定</li>
-            <li><code>PAT</code> — <strong>不用新申请</strong>。打开仓库 Settings → Secrets → Actions 里已有的 <code>PAT</code>，把同一个值复制到 Worker。Cloudflare 读不到 GitHub 密钥，所以必须复制一份。Zepp 账号仍走仓库 CONFIG。</li>
+            <li><code>OWNER_PASSWORD</code> — 看板上输入的站长密码，你自己定。必须选 <strong>Secret</strong>，不要选 Variable。Variable 会在下次 Git 部署时被覆盖，还会明文出现在构建日志里。</li>
+            <li><code>PAT</code> — <strong>不用新申请</strong>。打开仓库 Settings → Secrets → Actions 里已有的 <code>PAT</code>，把同一个值复制到 Worker，同样选 Secret。Cloudflare 读不到 GitHub 密钥。Zepp 账号仍走仓库 CONFIG。</li>
           </ul>
           <p>命令行：<code>npx wrangler secret put OWNER_PASSWORD</code>，再 <code>npx wrangler secret put PAT</code>。</p>
           <p><a href="https://github.com/Kedreamix/mimotion/settings/secrets/actions" target="_blank" rel="noreferrer">打开仓库 Secrets →</a></p>
