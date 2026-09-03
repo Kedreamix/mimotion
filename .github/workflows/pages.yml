@@ -8,6 +8,7 @@ on:
       - "cron_change_time"
       - ".github/workflows/pages.yml"
       - ".github/scripts/build_pages_data.py"
+      - "util/params.py"
   workflow_dispatch:
   schedule:
     - cron: "20 */3 * * *"
@@ -36,6 +37,14 @@ jobs:
       - name: Build dashboard snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_VARS: ${{ toJSON(vars) }}
+          MIN_STEP: ${{ vars.MIN_STEP }}
+          MAX_STEP: ${{ vars.MAX_STEP }}
+          CRON_HOURS: ${{ vars.CRON_HOURS }}
+          SLEEP_GAP: ${{ vars.SLEEP_GAP }}
+          USE_CONCURRENT: ${{ vars.USE_CONCURRENT }}
+          PUSH_PLUS_HOUR: ${{ vars.PUSH_PLUS_HOUR }}
+          PUSH_PLUS_MAX: ${{ vars.PUSH_PLUS_MAX }}
         run: python3 .github/scripts/build_pages_data.py
 
       - name: Setup Pages

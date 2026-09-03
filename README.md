@@ -27,11 +27,12 @@
 - 填写token的名称，用于自己区别干嘛用的。
 - 选择token有效期，最大时长为1年。一年后需要重新续期或重建，唯一缺点
 - `Repository access` 选择 `Only select repositories` 勾选自己fork后的仓库，下拉可搜索：输入 mimotion 进行检索
-- 点击 `Repository permissions` 展开菜单，并勾选以下四个权限即可，其他的可以不勾选
-    - `Actions` Access: `Read and write` 用于获取Actions的权限
+- 点击 `Repository permissions` 展开菜单，并勾选以下权限即可，其他的可以不勾选
+    - `Actions` Access: `Read and write` 用于获取 Actions 权限，以及页面上的「马上刷步」
     - `Contents` Access: `Read and write` 用于更新定时任务和日志文件的权限
     - `Metadata` Access: `Read-only` 这个自带的必选
     - `Workflows` Access: `Read and write` 获取用于更新 `.github/workflow` 下文件的权限
+    - `Variables` Access: `Read and write` 用于参数页保存最小/最大步数和执行整点
 
 #### 你也可以创建更大权限的不限时token
 
@@ -66,6 +67,7 @@
 #### 添加名为 **CONFIG** 的Secret变量
 
 - 需要注意Secret变量是密文，提交后无法查看，只能删除或用新值更新，建议本地保存一下自己的配置数据方便后期修改。或者参考步骤八导出配置数据。
+- 账号、密码、推送 Token 必须放在 Secret `CONFIG` 里，**不要**写到公开的 GitHub Pages。步数、整点、间隔等可以改放到仓库 Variables，运行时会覆盖 CONFIG 里的同名键；详见下方「参数怎么改」。
 - CONFIG的内容：
 
   ```json
@@ -216,8 +218,49 @@
 仓库带了一个简单的状态页，用来看最近刷步是否成功、当前步数、下次定时，以及最近的 Actions 记录。页面只读公开数据，不会展示密码或 Secret。
 
 - 访问地址：`https://<你的GitHub用户名>.github.io/mimotion/`
+- 参数页：`https://<你的GitHub用户名>.github.io/mimotion/settings.html`
 - 本仓库示例：[https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)
-- 合并后由 `.github/workflows/pages.yml` 自动发布。第一次如果打不开，到 `Settings → Pages` 把 Source 选成 `GitHub Actions` 即可。
+- 由 `.github/workflows/pages.yml` 自动发布。第一次如果打不开，到 `Settings → Pages` 把 Source 选成 `GitHub Actions` 即可。
+
+### 参数怎么改（Pages / Variables / CONFIG）
+
+公开站点不能存密码。参数分成两层：
+
+| 放哪里 | 字段 | 以后怎么改 |
+|--------|------|------------|
+| Secret `CONFIG` | `USER` `PWD` 以及各类推送 Token | 参数页复制 JSON，粘贴到 Secrets；或按步骤八导出后再改 |
+| 仓库 Variables | `MIN_STEP` `MAX_STEP` `CRON_HOURS` `SLEEP_GAP` `USE_CONCURRENT` `PUSH_PLUS_HOUR` `PUSH_PLUS_MAX` | 参数页写入，或 Actions 工作流「更新参数」 |
+
+`main.py` 会把 Variables 覆盖到 CONFIG 的同名键上：Variables 为空则继续用 CONFIG。看板圆环目标读快照里的 `MAX_STEP`。
+
+参数页上的「执行整点」按**北京时间**勾选，保存时自动换成 UTC 再写入 `CRON_HOURS`。例如北京 `8,10,12,14,16,22` 对应 UTC `0,2,4,6,8,14`。
+
+三种改 Variables 的方式：
+
+1. 打开参数页或看板的「马上操作」，可选填 PAT（只存在本机）。Fine-grained token 需要 `Actions: Read and write`（马上刷步）和 `Variables: Read and write`（保存步数）。
+2. 不想把 PAT 放浏览器：到 Actions 手动跑 `刷步数` / `更新参数`，它们使用仓库里的 `secrets.PAT`。
+3. 直接打开 [仓库 Variables](../../settings/variables/actions) 手工填写。`CRON_HOURS` 这里必须填 UTC。
+
+看板和参数页还接了这些接口：
+
+- **马上刷步**：触发 `刷步数` 工作流。可带上这一次的最小/最大步数，不改默认值。
+- **保存步数范围**：把最小/最大写入 Variables，之后定时任务也用这组值。
+- **保存并刷步**：先保存再立刻跑一次。
+- **应用新定时**：触发 `Random Cron`，按 `CRON_HOURS` 换上下一次整点。
+- **刷新看板**：重新发布 GitHub Pages 快照。
+
+没有接「提取配置信息」：那会把密码推到聊天里，不适合放在公开页面上。
+
+#### 以后加一个新参数
+
+字段清单在 `docs/params.json`，参数页按这份 schema 生成表单，**新增字段是追加，不用改 HTML**。
+
+1. 在 `docs/params.json` 的 `tunable`（公开、可进 Variables）或 `secretConfig`（只进 CONFIG）里加一项。
+2. 用参数页或「更新参数」写入这个仓库变量。刷步会通过 `REPO_VARS` 注入全部 Variables，同名键自动覆盖 CONFIG。
+3. 若希望 Actions「更新参数」界面也有单独输入框，给 `.github/workflows/update-params.yml` 加一个 input；也可以只走该工作流的 `params_json`。
+4. 如果 `main.py` 还没有用到这个字段，再补读取逻辑。提交后刷新参数页即可看到新表单项。
+
+不要把 `USER` / `PWD` / Token 放到 `tunable` 或 Pages 快照里。
 
 ### 查看执行记录
 

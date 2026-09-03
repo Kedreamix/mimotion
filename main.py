@@ -13,6 +13,7 @@ import time
 import os
 
 from util.aes_help import encrypt_data, decrypt_data
+from util.params import overlay_config
 import util.zepp_helper as zeppHelper
 import util.push_util as push_util
 
@@ -381,6 +382,9 @@ if __name__ == "__main__":
             print("CONFIG格式不正确，请检查Secret配置，请严格按照JSON格式：使用双引号包裹字段和值，逗号不能多也不能少")
             traceback.print_exc()
             exit(1)
+        config, applied_vars = overlay_config(config)
+        if applied_vars:
+            print("仓库变量已覆盖 CONFIG：" + ", ".join(applied_vars))
         # 创建推送配置对象
         push_config = push_util.PushConfig(
             push_plus_token=config.get('PUSH_PLUS_TOKEN'),

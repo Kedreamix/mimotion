@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from util.params import collect_public_params
 
 OWNER = os.environ.get("GITHUB_REPOSITORY_OWNER", "Kedreamix")
 REPO = os.environ.get("GITHUB_REPOSITORY", f"{OWNER}/mimotion").split("/")[-1]
@@ -33,6 +38,7 @@ def main() -> None:
         "repo": f"{OWNER}/{REPO}",
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cronText": cron_text,
+        "params": collect_public_params(),
         "runs": [
             {
                 "name": item.get("name"),

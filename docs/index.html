@@ -19,6 +19,10 @@
         <h1>mimotion</h1>
         <p>Zepp Life 自动刷步看板</p>
       </div>
+      <nav class="nav" aria-label="页面">
+        <a href="./index.html" class="active">看板</a>
+        <a href="./settings.html">参数</a>
+      </nav>
     </div>
     <div class="top-meta">
       <time id="clock" datetime="">--:--:--</time>
@@ -77,6 +81,34 @@
 
     <section class="panel">
       <div class="panel-head">
+        <h2>马上操作</h2>
+        <span class="muted">步数范围写入 Variables；马上刷步会立刻触发工作流</span>
+      </div>
+      <p id="ops-status" class="banner" hidden></p>
+      <div class="ops-grid">
+        <label class="field">最小步数
+          <input id="op-min" type="number" min="1" step="1" placeholder="18000" />
+        </label>
+        <label class="field">最大步数
+          <input id="op-max" type="number" min="1" step="1" placeholder="25000" />
+        </label>
+      </div>
+      <label class="field">PAT（只存在本机，触发工作流用）
+        <input id="pat" type="password" autocomplete="off" placeholder="github_pat_ 或 ghp_" />
+      </label>
+      <div class="actions">
+        <button id="run-now" class="primary" type="button">马上刷步</button>
+        <button id="save-steps" type="button">保存步数范围</button>
+        <button id="save-and-run" type="button">保存并刷步</button>
+        <button id="apply-cron" type="button">应用新定时</button>
+        <button id="refresh-pages" type="button">刷新看板</button>
+        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 手动跑</a>
+      </div>
+      <p class="muted">马上刷步可用当前填的最小/最大作为<strong>这一次</strong>的范围。点「保存步数范围」才会变成以后默认值。</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2>今日时间轴</h2>
         <p class="muted" id="cron-caption">按北京时间显示计划整点</p>
       </div>
@@ -95,11 +127,14 @@
   <footer>
     <p>数据来自公开仓库文件 <code>cron_change_time</code> 与 GitHub Actions，不含账号密码。</p>
     <p>
+      <a href="./settings.html">参数设置</a>
+      ·
       <a id="repo-link" href="#" target="_blank" rel="noreferrer">仓库</a>
       ·
       <a id="workflow-link" href="#" target="_blank" rel="noreferrer">刷步工作流</a>
     </p>
   </footer>
+  <script src="./api.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
