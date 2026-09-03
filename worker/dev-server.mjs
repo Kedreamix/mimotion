@@ -6,7 +6,7 @@ const env = {
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
     || "http://127.0.0.1:8765,http://localhost:8765,http://127.0.0.1:8787",
   OWNER_PASSWORD: process.env.OWNER_PASSWORD || "",
-  OWNER_GITHUB_PAT: process.env.OWNER_GITHUB_PAT || "",
+  PAT: process.env.PAT || process.env.OWNER_GITHUB_PAT || "",
   OWNER_REPO: process.env.OWNER_REPO || "Kedreamix/mimotion",
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",

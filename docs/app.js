@@ -281,7 +281,7 @@
       $("owner-pwd").value = "";
       const msg = String(err.message || err);
       showOps(msg.includes("Failed to fetch") || msg.includes("Load failed")
-        ? "刷步接口暂不可用，请确认 Cloudflare Worker 已部署并配置 OWNER_PASSWORD 和 OWNER_GITHUB_PAT。"
+        ? "刷步接口暂不可用，请确认 Cloudflare Worker 已部署，并配置了 OWNER_PASSWORD，以及把仓库里已有的 PAT 复制到 Worker。"
         : msg, false);
     } finally {
       button.disabled = false;
@@ -307,7 +307,7 @@
         ready.textContent = "还没设置站长密码，先去 Cloudflare Worker 添加 OWNER_PASSWORD";
         if (setup) setup.open = true;
       } else if (!body.hasPat) {
-        ready.textContent = "密码已设，还需在 Worker 添加 OWNER_GITHUB_PAT（Actions:write）才能触发刷步";
+        ready.textContent = "密码已设。把仓库 Secrets 里已有的 PAT 复制到 Worker 即可，不用新申请";
         if (setup) setup.open = true;
       }
     } catch {

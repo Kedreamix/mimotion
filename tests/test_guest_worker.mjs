@@ -187,7 +187,7 @@ test("owner-status reports whether worker secrets are configured", async () => {
 
   const ready = await read(await handleRequest(new Request("https://guest.test/owner-status", {
     headers: { Origin: "https://kedreamix.github.io" },
-  }), ownerEnv({ OWNER_GITHUB_PAT: "github_pat_test" })));
+  }), ownerEnv({ PAT: "github_pat_test" })));
   assert.equal(ready.body.configured, true);
   assert.equal(ready.body.hasPat, true);
   assert.equal(JSON.stringify(ready.body).includes("github_pat_test"), false);
@@ -205,18 +205,18 @@ test("owner-run returns 503 when owner password secret is missing", async () => 
 test("owner-run returns 401 for wrong password", async () => {
   const res = await handleRequest(
     ownerRequest({ password: "wrong" }, "ip-wrong"),
-    ownerEnv({ OWNER_GITHUB_PAT: "github_pat_test" }),
+    ownerEnv({ PAT: "github_pat_test" }),
   );
   const payload = await read(res);
   assert.equal(payload.status, 401);
   assert.match(payload.body.error, /密码/);
 });
 
-test("owner-run returns 503 when OWNER_GITHUB_PAT is missing after password check", async () => {
+test("owner-run returns 503 when PAT is missing after password check", async () => {
   const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-pat"), ownerEnv());
   const payload = await read(res);
   assert.equal(payload.status, 503);
-  assert.match(payload.body.error, /OWNER_GITHUB_PAT/);
+  assert.match(payload.body.error, /PAT/);
 });
 
 test("owner-run triggers workflow_dispatch via GitHub API", async () => {
@@ -227,7 +227,7 @@ test("owner-run triggers workflow_dispatch via GitHub API", async () => {
   };
   const res = await handleRequest(
     ownerRequest({ password: "secret", min_step: 12000, max_step: 15000 }, "ip-owner-ok"),
-    ownerEnv({ OWNER_GITHUB_PAT: "github_pat_test", OWNER_REPO: "TestOwner/mimotion" }),
+    ownerEnv({ PAT: "github_pat_test", OWNER_REPO: "TestOwner/mimotion" }),
     fetchImpl,
   );
   const payload = await read(res);
@@ -242,6 +242,22 @@ test("owner-run triggers workflow_dispatch via GitHub API", async () => {
   assert.equal(JSON.stringify(payload.body).includes("github_pat_test"), false);
 });
 
+test("owner-run accepts OWNER_GITHUB_PAT as an alias for PAT", async () => {
+  let dispatched = null;
+  const fetchImpl = async (url, options = {}) => {
+    dispatched = { url: String(url), options };
+    return new Response(null, { status: 204 });
+  };
+  const res = await handleRequest(
+    ownerRequest({ password: "secret" }, "ip-owner-alias"),
+    ownerEnv({ OWNER_GITHUB_PAT: "github_pat_alias", OWNER_REPO: "TestOwner/mimotion" }),
+    fetchImpl,
+  );
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  assert.match(dispatched.options.headers.Authorization, /github_pat_alias/);
+});
+
 test("owner-run returns 400 when GitHub API rejects dispatch", async () => {
   const fetchImpl = async () => new Response(
     JSON.stringify({ message: "Resource not accessible by token" }),
@@ -249,7 +265,7 @@ test("owner-run returns 400 when GitHub API rejects dispatch", async () => {
   );
   const res = await handleRequest(
     ownerRequest({ password: "secret" }, "ip-owner-err"),
-    ownerEnv({ OWNER_GITHUB_PAT: "github_pat_bad", OWNER_REPO: "TestOwner/mimotion" }),
+    ownerEnv({ PAT: "github_pat_bad", OWNER_REPO: "TestOwner/mimotion" }),
     fetchImpl,
   );
   const payload = await read(res);

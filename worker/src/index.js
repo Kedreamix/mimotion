@@ -92,9 +92,13 @@ async function runSync(user, password, body, fetchImpl) {
   });
 }
 
+function ownerPat(env) {
+  return env.PAT || env.OWNER_GITHUB_PAT || "";
+}
+
 function ownerSecretStatus(env) {
   const hasPassword = Boolean(env.OWNER_PASSWORD);
-  const hasPat = Boolean(env.OWNER_GITHUB_PAT);
+  const hasPat = Boolean(ownerPat(env));
   return { hasPassword, hasPat, configured: hasPassword };
 }
 
@@ -174,16 +178,17 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
       if (!safeEqual(body.password, env.OWNER_PASSWORD)) {
         return json({ ok: false, error: "站长密码不对" }, 401, origin, env);
       }
-      if (!env.OWNER_GITHUB_PAT) {
+      const pat = ownerPat(env);
+      if (!pat) {
         return json({
           ok: false,
-          error: "还没配置 OWNER_GITHUB_PAT。请在 Cloudflare Worker 添加一个只有 Actions:write 权限的 fine-grained token。",
+          error: "还没把仓库里的 PAT 放到 Worker。不用新申请：把 GitHub Secrets 里已有的 PAT 复制到 Cloudflare（Secret 名用 PAT 即可）。Worker 读不到 GitHub 密钥。",
         }, 503, origin, env);
       }
       const repo = env.OWNER_REPO || "Kedreamix/mimotion";
       await triggerWorkflowDispatch({
         repo,
-        pat: env.OWNER_GITHUB_PAT,
+        pat,
         workflowId: "run.yml",
         inputs: {
           ...(body.min_step ? { min_step: String(body.min_step) } : {}),
