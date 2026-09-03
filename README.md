@@ -249,18 +249,17 @@
 游客表单和站长密码都提交到独立 Worker，**不会触发**仓库 `run.yml`，也**不会读取** GitHub `CONFIG`。
 
 - 看板地址始终是 `https://kedreamix.github.io/mimotion/`。Worker 只是刷步接口。
-- 站长刷步走 `POST /owner-run`，只带密码。Zepp 账号放在 Worker Secret：`OWNER_PASSWORD`、`OWNER_USER`、`OWNER_PWD`。
+- 站长刷步走 `POST /owner-run`，只带密码。Worker 验密码通过后触发 `workflow_dispatch`，Zepp 账号仍从仓库 `CONFIG` 读取，不用在 Cloudflare 再配一份。Worker Secret 只需要 `OWNER_PASSWORD` 和 `OWNER_GITHUB_PAT`（Actions:write）。
 - 游客密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
 - 按 IP 限流（10 分钟 5 次）。
-- 本地验证：`OWNER_PASSWORD=demo OWNER_USER=13800138000 OWNER_PWD=secret node worker/dev-server.mjs`
+- 本地验证：`OWNER_PASSWORD=demo OWNER_GITHUB_PAT=xxx node worker/dev-server.mjs`
 - **不要**把 `OWNER_PASSWORD` 写成 GitHub Variables / `params.json`。公开仓库里谁都能看到。
 - 上线：
 
 ```bash
 npx wrangler deploy
 npx wrangler secret put OWNER_PASSWORD
-npx wrangler secret put OWNER_USER
-npx wrangler secret put OWNER_PWD
+npx wrangler secret put OWNER_GITHUB_PAT
 ```
 
 若 wrangler 打印的不是 `https://mimotion.kedreamix.workers.dev`，把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`。

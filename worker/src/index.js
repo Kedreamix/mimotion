@@ -3,6 +3,30 @@ import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectU
 import { safeEqual } from "./secret.js";
 import { guestSync } from "./zepp.js";
 
+async function triggerWorkflowDispatch({ repo, pat, workflowId = "run.yml", inputs = {}, fetchImpl = fetch }) {
+  const [owner, repoName] = repo.split("/");
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflowId}/dispatches`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${pat}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      body: JSON.stringify({ ref: "master", inputs }),
+    },
+  );
+  if (res.status === 204) return { ok: true };
+  let msg = `GitHub API ${res.status}`;
+  try {
+    const body = await res.json();
+    if (body.message) msg = body.message;
+  } catch { /* ignore */ }
+  throw new Error(msg);
+}
+
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 5, windowMs: 10 * 60 * 1000 });
 
@@ -70,8 +94,8 @@ async function runSync(user, password, body, fetchImpl) {
 
 function ownerSecretStatus(env) {
   const hasPassword = Boolean(env.OWNER_PASSWORD);
-  const hasAccount = Boolean(env.OWNER_USER && env.OWNER_PWD);
-  return { hasPassword, hasAccount, configured: hasPassword && hasAccount };
+  const hasPat = Boolean(env.OWNER_GITHUB_PAT);
+  return { hasPassword, hasPat, configured: hasPassword };
 }
 
 export async function handleRequest(request, env = {}, fetchImpl = fetch) {
@@ -150,13 +174,27 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
       if (!safeEqual(body.password, env.OWNER_PASSWORD)) {
         return json({ ok: false, error: "站长密码不对" }, 401, origin, env);
       }
-      if (!env.OWNER_USER || !env.OWNER_PWD) {
+      if (!env.OWNER_GITHUB_PAT) {
         return json({
           ok: false,
-          error: "站长刷步还没配置 Worker 密钥。请添加 OWNER_USER 和 OWNER_PWD。",
+          error: "还没配置 OWNER_GITHUB_PAT。请在 Cloudflare Worker 添加一个只有 Actions:write 权限的 fine-grained token。",
         }, 503, origin, env);
       }
-      result = await runSync(env.OWNER_USER, env.OWNER_PWD, body, fetchImpl);
+      const repo = env.OWNER_REPO || "Kedreamix/mimotion";
+      await triggerWorkflowDispatch({
+        repo,
+        pat: env.OWNER_GITHUB_PAT,
+        workflowId: "run.yml",
+        inputs: {
+          ...(body.min_step ? { min_step: String(body.min_step) } : {}),
+          ...(body.max_step ? { max_step: String(body.max_step) } : {}),
+        },
+        fetchImpl,
+      });
+      return json({
+        ok: true,
+        message: "已触发 GitHub Actions 刷步，账号从仓库 CONFIG 读取，稍后可在 Actions 页面查看进度",
+      }, 200, origin, env);
     } else {
       result = await runSync(body.user, body.password, body, fetchImpl);
     }

@@ -266,7 +266,7 @@
     const button = $("run-now");
     button.disabled = true;
     button.innerHTML = "正在刷步…";
-    showOps("正在用站长密码刷步，不会走 GitHub。", true);
+    showOps("正在验证密码，通过后触发 GitHub Actions 刷步…", true);
     try {
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-run`, {
         method: "POST",
@@ -282,7 +282,7 @@
       showOps(body.message || `已同步 ${body.step} 步`, true);
     } catch (err) {
       $("owner-pwd").value = "";
-      showOps(String(err.message || err) + "。本地预览请先启动 worker/dev-server.mjs。", false);
+      showOps(String(err.message || err), false);
     } finally {
       button.disabled = false;
       button.innerHTML = "马上刷步 <span>→</span>";
@@ -298,30 +298,20 @@
     const ready = $("account-ready");
     const setup = $("owner-setup");
     const endpoint = window.MIMO_GUEST_API;
-    if (!endpoint) {
-      ready.textContent = "刷步接口还没部署。";
-      if (setup) setup.open = true;
-      return;
-    }
+    if (!endpoint) return;
     try {
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-status`);
+      if (!res.ok) return;
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `status ${res.status}`);
-      if (body.configured) {
-        ready.textContent = "输入站长密码，验证成功后立即开刷";
-        return;
+      if (!body.configured) {
+        ready.textContent = "还没设置站长密码，先去 Cloudflare Worker 添加 OWNER_PASSWORD";
+        if (setup) setup.open = true;
+      } else if (!body.hasPat) {
+        ready.textContent = "密码已设，还需在 Worker 添加 OWNER_GITHUB_PAT（Actions:write）才能触发刷步";
+        if (setup) setup.open = true;
       }
-      if (!body.hasPassword) {
-        ready.textContent = "还没设置站长密码，先去 Cloudflare Worker 添加密钥";
-      } else if (!body.hasAccount) {
-        ready.textContent = "密码已设，还缺 Zepp 账号密钥 OWNER_USER / OWNER_PWD";
-      } else {
-        ready.textContent = "站长刷步还没配置完成";
-      }
-      if (setup) setup.open = true;
     } catch {
-      ready.textContent = "刷步接口连不上。先部署 Worker，再设置 OWNER_PASSWORD";
-      if (setup) setup.open = true;
+      /* Worker 未部署时静默忽略，用户还是可以尝试输密码 */
     }
   }
 

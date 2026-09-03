@@ -63,14 +63,14 @@
           <p>在仓库根目录执行 <code>npx wrangler login</code>，再执行 <code>npx wrangler deploy</code>。</p>
         </li>
         <li>
-          <strong>添加三个密钥</strong>
+          <strong>添加两个密钥</strong>
           <p>打开 <a href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare 控制台</a> → Workers &amp; Pages → <code>mimotion</code> → Settings → Variables and Secrets，添加：</p>
           <ul>
             <li><code>OWNER_PASSWORD</code> — 看板上输入的站长密码，你自己定</li>
-            <li><code>OWNER_USER</code> — 你的 Zepp Life 账号</li>
-            <li><code>OWNER_PWD</code> — 你的 Zepp Life 密码</li>
+            <li><code>OWNER_GITHUB_PAT</code> — GitHub fine-grained token，只需要 <strong>Actions: write</strong> 权限。Zepp 账号还是从仓库 CONFIG 读，不用再配一遍。</li>
           </ul>
-          <p>命令行也可以：<code>npx wrangler secret put OWNER_PASSWORD</code>，另外两个同理。</p>
+          <p>命令行也可以：<code>npx wrangler secret put OWNER_PASSWORD</code>，另一个同理。</p>
+          <p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">创建 fine-grained token →</a>（Repository access 选自己的 mimotion，Permissions → Repository permissions → Actions 设为 Read and write）</p>
         </li>
         <li>
           <strong>回看板刷步</strong>
