@@ -263,7 +263,7 @@ npx wrangler secret put OWNER_USER
 npx wrangler secret put OWNER_PWD
 ```
 
-若 wrangler 打印的不是 `https://mimotion-guest.kedreamix.workers.dev`，把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`。
+若 wrangler 打印的不是 `https://mimotion.kedreamix.workers.dev`，把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`。
 - 允许的来源按看板地址匹配：`https://kedreamix.github.io/mimotion/`（浏览器 Origin 不含路径，Worker 会按站点 origin 放行）。
 - Cloudflare 控制台允许出站域名：`api-user.zepp.com`、`account.huami.com`、`api-mifit-cn.huami.com`。
 

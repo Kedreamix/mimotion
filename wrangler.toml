@@ -1,5 +1,7 @@
+# Cloudflare Workers Builds 在仓库根目录执行 `npx wrangler deploy`。
+# 控制台里的 Worker 名叫 mimotion，必须和 name 一致。
 name = "mimotion"
-main = "src/index.js"
+main = "worker/src/index.js"
 compatibility_date = "2024-09-23"
 
 [vars]
