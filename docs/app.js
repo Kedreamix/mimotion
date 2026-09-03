@@ -254,7 +254,7 @@
     el.textContent = text;
   }
 
-  $("run-now").addEventListener("click", async () => {
+  async function runOwner() {
     const password = ($("owner-pwd").value || "").trim();
     if (!password) {
       showOps("请输入站长密码。", false);
@@ -266,7 +266,9 @@
       showOps("刷步接口还没部署。", false);
       return;
     }
-    $("run-now").disabled = true;
+    const button = $("run-now");
+    button.disabled = true;
+    button.innerHTML = "正在刷步…";
     showOps("正在用站长密码刷步，不会走 GitHub。", true);
     try {
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-run`, {
@@ -285,8 +287,14 @@
       $("owner-pwd").value = "";
       showOps(String(err.message || err) + "。本地预览请先启动 worker/dev-server.mjs。", false);
     } finally {
-      $("run-now").disabled = false;
+      button.disabled = false;
+      button.innerHTML = "马上刷步 <span>→</span>";
     }
+  }
+
+  $("run-now").addEventListener("click", runOwner);
+  $("owner-pwd").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") runOwner();
   });
 
   function showGuest(text, ok) {
