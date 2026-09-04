@@ -231,6 +231,34 @@ test("guest handler maps Huami login 401 to a password error", async () => {
   assert.equal(JSON.stringify(payload.body).includes("wrong"), false);
 });
 
+test("guest handler writes audit log without the password", async () => {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...args) => lines.push(args.map(String).join(" "));
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?error=401&" },
+    },
+  ]);
+  try {
+    await handleRequest(new Request("https://guest.test/guest-run", {
+      method: "POST",
+      headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "guest-log" },
+      body: JSON.stringify({ user: "a@b.com", password: "super-secret-pass", step: 3000 }),
+    }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }, fetchImpl);
+  } finally {
+    console.log = orig;
+  }
+  const dumped = lines.join("\n");
+  assert.match(dumped, /"kind":"guest-run"/);
+  assert.match(dumped, /"ok":false/);
+  assert.match(dumped, /"password_len":17/);
+  assert.equal(dumped.includes("super-secret-pass"), false);
+});
+
 test("guest handler returns huami-wait when Huami never answers", async () => {
   const fetchImpl = () => new Promise(() => {});
   const res = await handleRequest(new Request("https://guest.test/guest-run", {

@@ -1,7 +1,7 @@
 import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
-import { guestSync } from "./zepp.js";
+import { guestSync, maskUser, normalizeUser } from "./zepp.js";
 
 async function triggerWorkflowDispatch({ repo, pat, workflowId = "run.yml", inputs = {}, fetchImpl = fetch }) {
   const [owner, repoName] = repo.split("/");
@@ -79,6 +79,20 @@ function json(data, status, origin, env) {
 
 function parseBody(request) {
   return request.json();
+}
+
+function logGuest(entry) {
+  console.log(JSON.stringify({
+    kind: "guest-run",
+    ok: Boolean(entry.ok),
+    user: entry.user || "",
+    password_len: Number(entry.password_len) || 0,
+    step: entry.step ?? null,
+    stage: entry.stage || "",
+    error: entry.error || "",
+    elapsed_ms: entry.elapsed_ms,
+    trace: entry.trace || [],
+  }));
 }
 
 async function runSync(user, password, body, fetchImpl) {
@@ -217,9 +231,34 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
         message: "已触发 GitHub Actions 刷步，账号从仓库 CONFIG 读取，稍后可在 Actions 页面查看进度",
       }, 200, origin, env);
     } else {
+      const receivedUser = maskUser(normalizeUser(body.user));
+      const passwordLen = String(body.password || "").trim().length;
       const rawDeadline = Number(env.GUEST_DEADLINE_MS);
       const deadlineMs = Number.isFinite(rawDeadline) && rawDeadline > 0 ? rawDeadline : 20000;
-      result = await withDeadline(runSync(body.user, body.password, body, fetchImpl), deadlineMs);
+      try {
+        result = await withDeadline(runSync(body.user, body.password, body, fetchImpl), deadlineMs);
+        logGuest({
+          ok: true,
+          user: result.user || receivedUser,
+          password_len: passwordLen,
+          step: result.step,
+          stage: "done",
+          elapsed_ms: result.elapsed_ms,
+          trace: result.trace,
+        });
+      } catch (err) {
+        logGuest({
+          ok: false,
+          user: (err.received && err.received.user) || receivedUser,
+          password_len: (err.received && err.received.password_len) || passwordLen,
+          step: body.step,
+          stage: err.stage || "worker",
+          error: String(err.message || err),
+          elapsed_ms: err.elapsed_ms,
+          trace: err.trace,
+        });
+        throw err;
+      }
     }
     return json({
       ok: true,

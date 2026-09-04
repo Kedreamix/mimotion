@@ -110,11 +110,12 @@
     <div>
       <p>看板是站长的定时自动刷步。动动吧是给路过的人：自己填号，指定步数，点一次就同步。</p>
       <p>步数范围 1 – 98,800。同一网络请别连点，接口有短时限流。</p>
-      <p>想每天自动跑，去 <a href="./">看板</a> 看站长那套定时。</p>
+      <p>提交记录在 Cloudflare Worker 日志里，不在 GitHub Actions。打开 Cloudflare → Workers → mimotion → Observability / Logs，搜 guest-run。只会看到脱敏账号和密码位数，看不到密码。</p>
+      <p>电脑上也可以按 F12 → Network，点 guest-run 看这一次的回包。</p>
     </div>
   </details>
 
   <script src="./guest-config.js"></script>
-  <script src="./dongdong.js?v=16"></script>
+  <script src="./dongdong.js?v=17"></script>
 </body>
 </html>
