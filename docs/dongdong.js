@@ -104,7 +104,7 @@
       : "";
     if ((body && body.stage === "login" && /401|403|unauthorized/i.test(errorText))
       || /accessToken 失败\s*401/.test(errorText)) {
-      return `华米拒绝登录：账号或密码不对。${received}请手打 Zepp Life 自己的密码，不要用浏览器自动填充（这个站在 github.io 上，容易填成 GitHub 密码）。`.replace(/\s+/g, " ").trim();
+      return `请检查密码。${received}要用 Zepp Life 自己的密码手打，不要用浏览器自动填充。`.replace(/\s+/g, " ").trim();
     }
     if (body && body.stage) {
       const where = names[body.stage] || body.stage;
@@ -141,11 +141,28 @@
     document.querySelector(".stub span:first-child").textContent = "今日通行条";
   });
 
+  function renderStats(body) {
+    const stats = body && body.stats ? body.stats : {};
+    if ($("api-ver") && body && body.api) $("api-ver").textContent = body.api;
+    if ($("stat-rate")) {
+      if (stats.total) {
+        $("stat-rate").textContent = `${stats.success_rate}% · ${stats.ok}/${stats.total}`;
+      } else {
+        $("stat-rate").textContent = "暂无样本";
+      }
+    }
+    if ($("stat-sla")) {
+      $("stat-sla").textContent = Number.isFinite(stats.median_ms)
+        ? `${(stats.median_ms / 1000).toFixed(1)}s`
+        : "通常 2–6s";
+    }
+  }
+
   async function ping() {
     const live = $("api-live");
     const endpoint = window.MIMO_GUEST_API;
     if (!endpoint) {
-      live.textContent = "接口离线";
+      live.textContent = "离线";
       live.classList.add("off");
       return;
     }
@@ -153,10 +170,11 @@
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/health`, { cache: "no-store" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) throw new Error();
-      live.textContent = "接口在线";
+      live.textContent = "在线";
       live.classList.remove("off");
+      renderStats(body);
     } catch {
-      live.textContent = "接口离线";
+      live.textContent = "离线";
       live.classList.add("off");
     }
   }
@@ -204,14 +222,14 @@
     try {
       const { res, body } = await postGuest(endpoint, payload);
       if (!res.ok || !body.ok) {
-        console.info("[动动吧] 失败", body);
+        console.info("[迈步] 失败", body);
         showResult("bad", "没走成", breakText("worker", body));
         return;
       }
       $("password").value = "";
       const step = Number(body.step);
       setStep(step);
-      console.info("[动动吧] 成功", { step, trace: body.trace, elapsed_ms: body.elapsed_ms });
+      console.info("[迈步] 成功", { step, trace: body.trace, elapsed_ms: body.elapsed_ms });
       showReceipt({ step, user: body.user, trace: body.trace, elapsed_ms: body.elapsed_ms });
     } catch (err) {
       if (isDropped(err)) {
@@ -222,6 +240,7 @@
     } finally {
       button.disabled = false;
       button.innerHTML = "走这一趟 <span>→</span>";
+      ping();
     }
   });
 })();

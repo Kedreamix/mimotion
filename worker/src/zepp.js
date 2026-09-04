@@ -21,7 +21,7 @@ export function describeLoginError(code) {
     /* keep raw */
   }
   if (raw === "401" || raw === "403" || /unauthorized/i.test(raw)) {
-    return "账号或密码不对。请用 Zepp Life 自己的邮箱/手机和密码，不要用小米账号快捷登录。";
+    return "请检查密码。要用 Zepp Life 自己的邮箱/手机和密码，不要用小米账号快捷登录。";
   }
   return `获取 accessToken 失败 ${raw}`;
 }

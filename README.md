@@ -237,7 +237,7 @@
 
 参数页会明确区分两类能力：
 
-- **游客一次性刷步**：打开 [动动吧](https://kedreamix.github.io/mimotion/dongdong.html)，填写自己的 Zepp Life 账号、密码和步数，点一次即可。不走定时任务，也不动仓库账号。
+- **游客一次性刷步**：打开 [迈步](https://kedreamix.github.io/mimotion/dongdong.html)，填写自己的 Zepp Life 账号、密码和步数，点一次即可。不走定时任务，也不动仓库账号。
 - **站长刷步只要密码**：打开 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)，输入站长密码立刻刷自己的号，不用 GitHub。
 - **改仓库变量才要 PAT**：参数页写入 Variables、应用定时仍走 GitHub。
 - **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
