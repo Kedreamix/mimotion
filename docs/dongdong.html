@@ -1,95 +1,93 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark light" />
-  <meta name="theme-color" content="#f4f4f5" />
-  <title>动动吧 · 一次性更新步数</title>
-  <meta name="description" content="一次性更新 Zepp Life / 小米运动步数。填账号、密码、步数，点一下就好。" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23111111'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-size='28' fill='white'%3E跑%3C/text%3E%3C/svg%3E" />
+  <meta name="theme-color" content="#07090d" />
+  <title>动动吧 · mimotion 一次性刷步</title>
+  <meta name="description" content="今天走几步？填自己的 Zepp Life 账号，走一趟就结束。不定时、不入库。" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./dongdong.css" />
 </head>
 <body>
-  <header class="bar">
-    <div class="metrics">
-      <span>API v1.0</span>
-      <span>可用率 99.9%</span>
-      <span>SLA ≤ 2s</span>
-    </div>
-    <div class="theme">
-      <button id="theme-btn" type="button" aria-haspopup="listbox" aria-expanded="false">主题</button>
-      <ul id="theme-menu" hidden>
-        <li><button type="button" data-theme="light">浅色</button></li>
-        <li><button type="button" data-theme="dark">深色</button></li>
-        <li><button type="button" data-theme="system">系统</button></li>
-      </ul>
+  <div class="glow" aria-hidden="true"></div>
+  <header class="top">
+    <a class="brand" href="./">
+      <span class="logo" aria-hidden="true"></span>
+      <span>
+        <strong>mimotion</strong>
+        <small>一次性刷步</small>
+      </span>
+    </a>
+    <nav class="nav" aria-label="页面">
+      <a href="./">看板</a>
+      <a href="./dongdong.html" class="active">动动吧</a>
+      <a href="./settings.html">参数</a>
+    </nav>
+    <div class="top-actions">
+      <span id="api-live" class="live">接口检测中</span>
+      <button id="theme-btn" type="button" title="切换深浅色">浅色</button>
     </div>
   </header>
 
-  <main class="card">
-    <div class="hero">
-      <h1>动动吧</h1>
-      <p>更新您的运动步数数据</p>
-      <span id="api-live" class="live">API 检测中</span>
-    </div>
-
-    <nav class="tabs" role="tablist">
-      <button type="button" class="active" data-tab="update" role="tab" aria-selected="true">步数更新</button>
-      <button type="button" data-tab="about" role="tab" aria-selected="false">关于工具</button>
-    </nav>
-
-    <section id="panel-update" class="panel">
-      <form id="form">
-        <label>账号
-          <input id="user" type="text" autocomplete="username" placeholder="请输入账号" required />
-        </label>
-        <label>密码
-          <input id="password" type="password" autocomplete="current-password" placeholder="请输入密码" required />
-        </label>
-        <label>步数
-          <input id="step" type="number" min="1" max="98800" step="1" value="20000" required />
-        </label>
-        <div class="slider-row">
-          <span>1</span>
-          <input id="slider" type="range" min="1" max="98800" value="20000" />
-          <span>98,800</span>
+  <main class="play">
+    <section class="watch" aria-label="目标步数">
+      <p class="kicker">TODAY · 自己走一趟</p>
+      <h1>今天走几步？</h1>
+      <div class="dial" aria-hidden="true">
+        <svg viewBox="0 0 140 140">
+          <circle class="track" cx="70" cy="70" r="58" />
+          <circle id="ring" class="ring" cx="70" cy="70" r="58" />
+        </svg>
+        <div class="dial-core">
+          <strong id="step-display">20,000</strong>
+          <span>步</span>
+          <em id="mood">有点猛</em>
         </div>
-        <button id="submit" class="go" type="submit">动动呗</button>
-      </form>
-      <p id="status" class="status" hidden></p>
+      </div>
+      <p id="distance" class="distance">大约 14.0 公里 · 操场 35 圈</p>
+      <input id="slider" type="range" min="1" max="98800" value="20000" aria-label="步数" />
+      <div class="chips" id="chips">
+        <button type="button" data-step="3000">3 千 · 赖床</button>
+        <button type="button" data-step="8000">8 千 · 溜达</button>
+        <button type="button" data-step="12000">1.2 万 · 日常</button>
+        <button type="button" data-step="20000" class="on">2 万 · 暴走</button>
+        <button type="button" data-step="30000">3 万 · 疯走</button>
+      </div>
     </section>
 
-    <section id="panel-about" class="panel" hidden>
-      <h2>关于动动吧</h2>
-      <p class="lead">一次性更新步数。不是定时任务，填完点一下就好。</p>
-      <h3>使用方法</h3>
-      <ol>
-        <li>输入你自己的 Zepp Life / 小米运动账号</li>
-        <li>输入密码（只用于这一次请求，页面不会保存）</li>
-        <li>用输入框或滑块设置目标步数（1 – 98,800）</li>
-        <li>点击「动动呗」提交</li>
-      </ol>
-      <h3>服务指标</h3>
-      <ul>
-        <li>可用性：99.9%</li>
-        <li>响应时间：≤ 2 秒（视 Zepp 接口而定）</li>
-        <li>API：v1.0</li>
-      </ul>
-      <h3>注意事项</h3>
-      <ul>
-        <li>请只操作自己的账号</li>
-        <li>需要 Zepp Life 账号，不是小米账号快捷登录</li>
-        <li>同一网络 10 分钟内请勿连续提交太多次</li>
-        <li>定时自动刷步请回 <a href="./">看板</a></li>
-      </ul>
-      <p class="disclaimer">本页仅提供一次性同步。账号密码不会写入仓库或保存在页面。</p>
+    <section class="pass">
+      <div class="stub">
+        <span>今日通行条</span>
+        <span id="pass-no">#20000</span>
+      </div>
+      <form id="form">
+        <p class="pass-lead">填自己的 Zepp Life 账号。走完这一趟就结束，不进仓库，不定闹钟。</p>
+        <label>Zepp Life 账号
+          <input id="user" type="text" autocomplete="username" placeholder="手机号或邮箱" required />
+        </label>
+        <label>密码
+          <input id="password" type="password" autocomplete="current-password" placeholder="只用于这一次" required />
+        </label>
+        <label>精确步数
+          <input id="step" type="number" min="1" max="98800" step="1" value="20000" required />
+        </label>
+        <button id="submit" class="go" type="submit">走这一趟 <span>→</span></button>
+      </form>
+      <p id="status" class="status" hidden></p>
+      <p class="hint">密码不会保存在页面。请只动自己的号。Zepp Life 账号，不是小米快捷登录。</p>
     </section>
   </main>
 
-  <footer>
-    <p>动动吧 · 一次性刷步 · <a href="./">看板</a></p>
-  </footer>
+  <details class="about">
+    <summary>这页和看板有什么不一样？</summary>
+    <div>
+      <p>看板是站长的定时自动刷步。动动吧是给路过的人：自己填号，指定步数，点一次就同步。</p>
+      <p>步数范围 1 – 98,800。同一网络请别连点，接口有短时限流。</p>
+      <p>想每天自动跑，去 <a href="./">看板</a> 看站长那套定时。</p>
+    </div>
+  </details>
 
   <script src="./guest-config.js"></script>
   <script src="./dongdong.js"></script>
