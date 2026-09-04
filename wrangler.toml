@@ -13,6 +13,18 @@ enabled = true
   invocation_logs = true
   head_sampling_rate = 1
 
+# Analytics Engine：dataset 在绑定里填名字即可，第一次写入时创建。
+# 控制台 Bindings → Analytics Engine，Variable name = USAGE，dataset = mimotion_usage
+[[analytics_engine_datasets]]
+binding = "USAGE"
+dataset = "mimotion_usage"
+
+# D1 库 mimotion，绑到 Worker 变量 DB。database_id 来自控制台。
+[[d1_databases]]
+binding = "DB"
+database_name = "mimotion"
+database_id = "a44e3fba-d5e2-4a0f-8b4a-589e7febe0d7"
+
 [vars]
 ALLOWED_ORIGINS = "https://kedreamix.github.io/mimotion,http://127.0.0.1:8765,http://localhost:8765,http://127.0.0.1:8787"
 OAUTH_REDIRECT_URI = "https://kedreamix.github.io/mimotion/"

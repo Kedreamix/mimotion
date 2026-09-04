@@ -350,6 +350,56 @@
     if (event.key === "Enter") runOwner();
   });
 
+  function renderUsage(body) {
+    const box = $("usage-box");
+    if (!box) return;
+    box.hidden = false;
+    const people = Number(body.unique_users) || 0;
+    const total = Number(body.total) || 0;
+    $("usage-summary").textContent = `迈步 ${people} 人 · ${total} 次 · 成功 ${Number(body.ok_count) || 0} · 失败 ${Number(body.fail_count) || 0}`;
+    const rows = Array.isArray(body.recent) ? body.recent : [];
+    $("usage-list").innerHTML = rows.length
+      ? rows.map((row) => {
+        const cls = Number(row.ok) === 1 ? "ok" : "fail";
+        const step = Number.isFinite(Number(row.step)) ? `${Number(row.step).toLocaleString("zh-CN")} 步` : "";
+        return `<li><span>${row.user || "—"}</span><span class="${cls}">${Number(row.ok) === 1 ? "成功" : "失败"} ${step}</span></li>`;
+      }).join("")
+      : "<li>还没有迈步记录。</li>";
+  }
+
+  async function loadUsage() {
+    const password = ($("owner-pwd").value || "").trim();
+    if (!password) {
+      showOps("请输入站长密码。", false);
+      $("owner-pwd").focus();
+      return;
+    }
+    const endpoint = window.MIMO_GUEST_API;
+    const button = $("usage-now");
+    button.disabled = true;
+    try {
+      if (!endpoint) throw new Error("用量接口暂不可用。");
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-usage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password, limit: 20 }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.ok) {
+        showOps(body.error || `读取用量失败（${res.status}）`, false);
+        return;
+      }
+      renderUsage(body);
+      showOps(`迈步已记录 ${body.unique_users || 0} 人。`, true);
+    } catch (err) {
+      showOps(String(err.message || err), false);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  $("usage-now").addEventListener("click", loadUsage);
+
   async function checkOwnerSetup() {
     const ready = $("account-ready");
     const endpoint = window.MIMO_GUEST_API;

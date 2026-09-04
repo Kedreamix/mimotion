@@ -2,6 +2,7 @@ import { parseOwnerAccounts } from "./config.js";
 import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
+import { hasAnalytics, hasD1, readUsage, recordUsage } from "./usage.js";
 import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, todayBeijing } from "./zepp.js";
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
 
@@ -111,7 +112,54 @@ function ownerSecretStatus(env) {
   } catch {
     hasAccount = false;
   }
-  return { hasPassword, hasAccount, hasConfig: hasAccount, configured: hasPassword };
+  return {
+    hasPassword,
+    hasAccount,
+    hasConfig: hasAccount,
+    configured: hasPassword,
+    hasD1: hasD1(env),
+    hasAnalytics: hasAnalytics(env),
+  };
+}
+
+async function handleOwnerUsage(request, env, origin) {
+  if (!env.OWNER_PASSWORD) {
+    return json({
+      ok: false,
+      error: "站长刷步还没配置完成。",
+      hasD1: hasD1(env),
+      hasAnalytics: hasAnalytics(env),
+    }, 503, origin, env);
+  }
+  let password = "";
+  let limit = 20;
+  if (request.method === "GET") {
+    const url = new URL(request.url);
+    password = url.searchParams.get("password") || "";
+    limit = url.searchParams.get("limit") || 20;
+  } else {
+    try {
+      const body = await request.json();
+      password = body && body.password;
+      limit = body && body.limit;
+    } catch {
+      return json({ ok: false, error: "请求格式不正确" }, 400, origin, env);
+    }
+  }
+  if (!safeEqual(password, env.OWNER_PASSWORD)) {
+    return json({ ok: false, error: "站长密码不对" }, 401, origin, env);
+  }
+  try {
+    const usage = await readUsage(env, { kind: "guest", limit });
+    return json(usage, 200, origin, env);
+  } catch (err) {
+    return json({
+      ok: false,
+      error: String(err.message || err),
+      hasD1: hasD1(env),
+      hasAnalytics: hasAnalytics(env),
+    }, err.status || 503, origin, env);
+  }
 }
 
 function resolveCache(ctx) {
@@ -183,6 +231,16 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
   }
   if (request.method === "GET" && path === "/owner-status") {
     return json({ ok: true, ...ownerSecretStatus(env) }, 200, origin, env);
+  }
+  if ((request.method === "GET" || request.method === "POST") && path === "/owner-usage") {
+    if (request.method === "POST" && !isAllowedOrigin(origin, env)) {
+      return json({ ok: false, error: "来源不被允许" }, 403, origin, env);
+    }
+    const limited = limiter(`owner:${clientKey(request)}`);
+    if (!limited.ok) {
+      return json({ ok: false, error: "请求太频繁，请稍后再试" }, 429, origin, env);
+    }
+    return handleOwnerUsage(request, env, origin);
   }
   if (request.method === "GET" && path === "/today-steps") {
     const cache = resolveCache(ctx);
@@ -330,6 +388,15 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
           : `已为 ${results.length} 个账号同步，最近 ${last.step} 步`,
       };
       await putTodayStepsCache(resolveCache(ctx), todayStepsPayload(todayBeijing(now), last.step), ctx);
+      await recordUsage(ctx, env, {
+        user: last.user,
+        password: body.password,
+        ok: true,
+        step: last.step,
+        stage: "done",
+        elapsed_ms: last.elapsed_ms,
+        kind: "owner",
+      });
     } else {
       const receivedUser = maskUser(normalizeUser(body.user));
       const passwordLen = String(body.password || "").trim().length;
@@ -348,6 +415,15 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         });
         if (passwordLen > 0) {
           await recordGuest(ctx, { ok: true, elapsed_ms: result.elapsed_ms });
+          await recordUsage(ctx, env, {
+            user: normalizeUser(body.user),
+            password: body.password,
+            ok: true,
+            step: result.step,
+            stage: "done",
+            elapsed_ms: result.elapsed_ms,
+            kind: "guest",
+          });
         }
       } catch (err) {
         logGuest({
@@ -362,6 +438,16 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         });
         if (passwordLen > 0) {
           await recordGuest(ctx, { ok: false, elapsed_ms: err.elapsed_ms });
+          await recordUsage(ctx, env, {
+            user: normalizeUser(body.user) || (err.received && err.received.user) || receivedUser,
+            password: body.password,
+            ok: false,
+            step: body.step,
+            stage: err.stage || "worker",
+            error: String(err.message || err),
+            elapsed_ms: err.elapsed_ms,
+            kind: "guest",
+          });
         }
         throw err;
       }

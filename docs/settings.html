@@ -19,8 +19,9 @@
       root.dataset.theme = mode;
       root.dataset.themePref = pref;
       root.style.colorScheme = mode;
+      if (localStorage.getItem("mimo-skin") === "pikachu") root.dataset.skin = "pikachu";
       var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", mode === "light" ? "#efe7db" : "#07090d");
+      if (meta) meta.setAttribute("content", root.dataset.skin === "pikachu" ? "#F7D948" : (mode === "light" ? "#efe7db" : "#07090d"));
     })();
   </script>
 </head>
@@ -137,7 +138,7 @@
     </details>
   </main>
   <script src="./api.js"></script>
-  <script src="./theme.js?v=1"></script>
+  <script src="./theme.js?v=2"></script>
   <script src="./settings.js"></script>
 </body>
 </html>

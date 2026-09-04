@@ -3,6 +3,7 @@ import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest, TODAY_STEPS_CACHE_URL } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
+import { hasAnalytics, hasD1, sanitizeError, usageRow } from "../worker/src/usage.js";
 import { resetStatsForTests } from "../worker/src/stats.js";
 import { applyBandTemplate, clampStep, describeLoginError, formBody, maskUser, normalizeUser, parseSummarySteps, regionHostFromLogin, stepRangeByTime, stepsFromBandData, todayBeijing } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
@@ -786,4 +787,404 @@ test("owner-run updates today-steps cache", async () => {
   assert.equal(cached.steps, 12000);
   assert.equal(cached.source, "huami");
   assert.equal(cached.date, todayBeijing());
+});
+
+function memoryD1() {
+  const rows = [];
+  let nextId = 1;
+  function query(sql, args) {
+    const kind = args[0] || "guest";
+    const filtered = rows.filter((row) => row.kind === kind);
+    if (/COUNT\(DISTINCT/i.test(sql) || /unique_users/i.test(sql)) {
+      const users = new Set(filtered.map((row) => row.user));
+      const okCount = filtered.filter((row) => Number(row.ok) === 1).length;
+      return [{
+        total: filtered.length,
+        unique_users: users.size,
+        ok_count: okCount,
+        fail_count: filtered.length - okCount,
+      }];
+    }
+    if (/ORDER BY/i.test(sql)) {
+      const limit = Number(args[1]) || 20;
+      return [...filtered].sort((a, b) => b.id - a.id).slice(0, limit);
+    }
+    return filtered;
+  }
+  return {
+    rows,
+    async exec() {
+      return { count: 2 };
+    },
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async run() {
+              if (/INSERT\s+INTO\s+guest_runs/i.test(sql)) {
+                const [created_at, user, ok, step, stage, error, elapsed_ms, kind] = args;
+                rows.push({
+                  id: nextId++,
+                  created_at,
+                  user,
+                  ok,
+                  step,
+                  stage,
+                  error,
+                  elapsed_ms,
+                  kind,
+                });
+              }
+              return { success: true };
+            },
+            async all() {
+              return { results: query(sql, args) };
+            },
+            async first() {
+              return query(sql, args)[0] || null;
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+function memoryAE() {
+  const points = [];
+  return {
+    points,
+    writeDataPoint(point) {
+      points.push({
+        blobs: [...(point.blobs || [])],
+        doubles: [...(point.doubles || [])],
+        indexes: [...(point.indexes || [])],
+      });
+    },
+  };
+}
+
+function waitCtx() {
+  const pending = [];
+  return {
+    pending,
+    waitUntil(task) {
+      pending.push(Promise.resolve(task));
+    },
+    async flush() {
+      await Promise.all(pending.splice(0));
+    },
+  };
+}
+
+function guestSuccessFetch() {
+  return mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
+}
+
+function guestFailFetch() {
+  return mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?error=401&" },
+    },
+  ]);
+}
+
+function guestRunRequest(body, ip = "guest-usage") {
+  return new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: {
+      Origin: "https://kedreamix.github.io",
+      "content-type": "application/json",
+      "CF-Connecting-IP": ip,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+test("hasD1 / hasAnalytics detect bindings without throwing", () => {
+  assert.equal(hasD1({}), false);
+  assert.equal(hasAnalytics({}), false);
+  assert.equal(hasD1({ DB: memoryD1() }), true);
+  assert.equal(hasAnalytics({ USAGE: memoryAE() }), true);
+});
+
+test("sanitizeError never keeps the password", () => {
+  assert.equal(sanitizeError("boom secret-pass", ["secret-pass"]), "boom [已隐藏]");
+  assert.match(sanitizeError("pwd=super-secret-pass"), /已隐藏/);
+  assert.equal(sanitizeError("pwd=super-secret-pass").includes("super-secret-pass"), false);
+});
+
+test("usageRow stores plaintext account and drops password", () => {
+  const row = usageRow({
+    user: "13800138000",
+    password: "guest-secret",
+    ok: true,
+    step: 12000,
+    stage: "done",
+    elapsed_ms: 42,
+    kind: "guest",
+  });
+  assert.equal(row.user, "13800138000");
+  assert.equal(row.ok, 1);
+  assert.equal(Object.prototype.hasOwnProperty.call(row, "password"), false);
+  assert.equal(JSON.stringify(row).includes("guest-secret"), false);
+});
+
+test("guest-run still 200 when D1 and Analytics Engine bindings are missing", async () => {
+  const payload = await read(await handleRequest(
+    guestRunRequest({ user: "13800138000", password: "guest-secret", step: 12000 }, "guest-no-bind"),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io" },
+    guestSuccessFetch(),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.ok, true);
+  assert.equal(JSON.stringify(payload.body).includes("guest-secret"), false);
+});
+
+test("guest-run writes D1 and Analytics Engine on success without storing password", async () => {
+  const db = memoryD1();
+  const ae = memoryAE();
+  const ctx = waitCtx();
+  const payload = await read(await handleRequest(
+    guestRunRequest({ user: "13800138000", password: "guest-secret", step: 12000 }, "guest-d1-ok"),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io", DB: db, USAGE: ae },
+    guestSuccessFetch(),
+    ctx,
+  ));
+  assert.equal(payload.status, 200);
+  assert.ok(ctx.pending.length >= 1);
+  await ctx.flush();
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].user, "+8613800138000");
+  assert.equal(db.rows[0].ok, 1);
+  assert.equal(db.rows[0].step, 12000);
+  assert.equal(db.rows[0].kind, "guest");
+  assert.equal(Object.prototype.hasOwnProperty.call(db.rows[0], "password"), false);
+  assert.equal(JSON.stringify(db.rows[0]).includes("guest-secret"), false);
+  assert.equal(JSON.stringify(payload.body).includes("guest-secret"), false);
+  assert.equal(ae.points.length, 1);
+  assert.deepEqual(ae.points[0].blobs.slice(0, 3), ["guest", "+8613800138000", "ok"]);
+  assert.equal(ae.points[0].indexes[0], "guest");
+  assert.equal(JSON.stringify(ae.points).includes("guest-secret"), false);
+});
+
+test("guest-run writes D1 and Analytics Engine on Huami failure", async () => {
+  const db = memoryD1();
+  const ae = memoryAE();
+  const payload = await read(await handleRequest(
+    guestRunRequest({ user: "a@b.com", password: "wrong-pass", step: 3000 }, "guest-d1-fail"),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io", DB: db, USAGE: ae },
+    guestFailFetch(),
+  ));
+  assert.equal(payload.status, 400);
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].user, "a@b.com");
+  assert.equal(db.rows[0].ok, 0);
+  assert.equal(db.rows[0].stage, "login");
+  assert.equal(JSON.stringify(db.rows[0]).includes("wrong-pass"), false);
+  assert.equal(ae.points[0].blobs[2], "fail");
+});
+
+test("empty password guest-run does not write usage", async () => {
+  const db = memoryD1();
+  const ae = memoryAE();
+  const payload = await read(await handleRequest(
+    guestRunRequest({ user: "a@b.com", password: "  ", step: 3000 }, "guest-empty-pwd"),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io", DB: db, USAGE: ae },
+  ));
+  assert.equal(payload.status, 400);
+  assert.equal(db.rows.length, 0);
+  assert.equal(ae.points.length, 0);
+});
+
+test("guest-run still 200 if D1 insert throws", async () => {
+  const ae = memoryAE();
+  const db = {
+    async exec() {
+      throw new Error("d1 down");
+    },
+    prepare() {
+      throw new Error("d1 down");
+    },
+  };
+  const payload = await read(await handleRequest(
+    guestRunRequest({ user: "13800138000", password: "guest-secret", step: 8000 }, "guest-d1-throw"),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io", DB: db, USAGE: ae },
+    guestSuccessFetch(),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.ok, true);
+  assert.equal(ae.points.length, 1);
+});
+
+test("guest-run uses waitUntil so D1 does not block the Huami response", async () => {
+  let resolveInsert;
+  const insertGate = new Promise((resolve) => {
+    resolveInsert = resolve;
+  });
+  const db = {
+    async exec() {},
+    prepare() {
+      return {
+        bind() {
+          return {
+            run: () => insertGate,
+          };
+        },
+      };
+    },
+  };
+  const ctx = waitCtx();
+  const started = Date.now();
+  const payload = await read(await handleRequest(
+    guestRunRequest({ user: "13800138000", password: "guest-secret", step: 5000 }, "guest-waituntil"),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io", DB: db },
+    guestSuccessFetch(),
+    ctx,
+  ));
+  assert.ok(Date.now() - started < 200);
+  assert.equal(payload.status, 200);
+  assert.ok(ctx.pending.length >= 1);
+  resolveInsert({ success: true });
+  await ctx.flush();
+});
+
+function usageRequest(method, extra = {}) {
+  const url = method === "GET"
+    ? `https://guest.test/owner-usage?password=${encodeURIComponent(extra.password || "")}&limit=${extra.limit || 20}`
+    : "https://guest.test/owner-usage";
+  return new Request(url, {
+    method,
+    headers: {
+      Origin: "https://kedreamix.github.io",
+      "content-type": "application/json",
+      "CF-Connecting-IP": extra.ip || "owner-usage",
+    },
+    body: method === "POST" ? JSON.stringify({ password: extra.password, limit: extra.limit }) : undefined,
+  });
+}
+
+test("owner-usage returns 503 when OWNER_PASSWORD is missing", async () => {
+  const payload = await read(await handleRequest(
+    usageRequest("POST", { password: "secret", ip: "usage-no-secret" }),
+    { ALLOWED_ORIGINS: "https://kedreamix.github.io" },
+  ));
+  assert.equal(payload.status, 503);
+  assert.equal(payload.body.ok, false);
+});
+
+test("owner-usage returns 401 for wrong password", async () => {
+  const payload = await read(await handleRequest(
+    usageRequest("POST", { password: "wrong", ip: "usage-401" }),
+    ownerEnv({ DB: memoryD1() }),
+  ));
+  assert.equal(payload.status, 401);
+  assert.match(payload.body.error, /密码/);
+  assert.equal(JSON.stringify(payload.body).includes("secret"), false);
+});
+
+test("owner-usage returns 503 when D1 is not bound", async () => {
+  const payload = await read(await handleRequest(
+    usageRequest("POST", { password: "secret", ip: "usage-no-d1" }),
+    ownerEnv(),
+  ));
+  assert.equal(payload.status, 503);
+  assert.match(payload.body.error, /D1/);
+  assert.equal(payload.body.hasD1, false);
+});
+
+test("owner-status reports hasD1 and hasAnalytics when bindings exist", async () => {
+  const payload = await read(await handleRequest(new Request("https://guest.test/owner-status", {
+    headers: { Origin: "https://kedreamix.github.io" },
+  }), ownerEnv({ DB: memoryD1(), USAGE: memoryAE() })));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.hasD1, true);
+  assert.equal(payload.body.hasAnalytics, true);
+  assert.equal(JSON.stringify(payload.body).includes("secret"), false);
+});
+
+test("GET and POST /owner-usage return unique users and recent plaintext accounts", async () => {
+  const db = memoryD1();
+  const env = ownerEnv({ DB: db, USAGE: memoryAE() });
+  await handleRequest(
+    guestRunRequest({ user: "a@b.com", password: "one-secret", step: 3000 }, "usage-a"),
+    env,
+    guestSuccessFetch(),
+  );
+  await handleRequest(
+    guestRunRequest({ user: "13800138000", password: "two-secret", step: 4000 }, "usage-b"),
+    env,
+    guestSuccessFetch(),
+  );
+  await handleRequest(
+    guestRunRequest({ user: "a@b.com", password: "bad-secret", step: 4000 }, "usage-c"),
+    env,
+    guestFailFetch(),
+  );
+
+  const posted = await read(await handleRequest(
+    usageRequest("POST", { password: "secret", limit: 10, ip: "usage-post" }),
+    env,
+  ));
+  assert.equal(posted.status, 200);
+  assert.equal(posted.body.ok, true);
+  assert.equal(posted.body.unique_users, 2);
+  assert.equal(posted.body.total, 3);
+  assert.equal(posted.body.ok_count, 2);
+  assert.equal(posted.body.fail_count, 1);
+  assert.equal(posted.body.recent[0].user, "a@b.com");
+  assert.equal(posted.body.recent.some((row) => row.user === "+8613800138000"), true);
+  assert.equal(JSON.stringify(posted.body).includes("secret"), false);
+  assert.equal(JSON.stringify(posted.body).includes("one-secret"), false);
+  assert.equal(JSON.stringify(posted.body).includes("two-secret"), false);
+  assert.equal(JSON.stringify(posted.body).includes("bad-secret"), false);
+  assert.equal(posted.body.recent.every((row) => !("password" in row)), true);
+
+  const gotten = await read(await handleRequest(
+    usageRequest("GET", { password: "secret", limit: 10, ip: "usage-get" }),
+    env,
+  ));
+  assert.equal(gotten.status, 200);
+  assert.equal(gotten.body.unique_users, 2);
+  assert.equal(gotten.body.hasD1, true);
+});
+
+test("owner-run records kind=owner without Zepp password or owner password", async () => {
+  const db = memoryD1();
+  const ae = memoryAE();
+  const payload = await read(await handleRequest(
+    ownerRequest({ password: "secret", step: 9000 }, "owner-usage-row"),
+    ownerEnv({ USER: "owner@x.com", PWD: "zepp-secret", DB: db, USAGE: ae }),
+    guestSuccessFetch(),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].kind, "owner");
+  assert.equal(db.rows[0].user.includes("@"), false);
+  assert.match(db.rows[0].user, /\*\*\*\*/);
+  assert.equal(JSON.stringify(db.rows[0]).includes("zepp-secret"), false);
+  assert.equal(JSON.stringify(db.rows[0]).includes("secret"), false);
+  assert.equal(ae.points[0].indexes[0], "owner");
 });

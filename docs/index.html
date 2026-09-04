@@ -20,8 +20,9 @@
       root.dataset.theme = mode;
       root.dataset.themePref = pref;
       root.style.colorScheme = mode;
+      if (localStorage.getItem("mimo-skin") === "pikachu") root.dataset.skin = "pikachu";
       var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", mode === "light" ? "#efe7db" : "#07090d");
+      if (meta) meta.setAttribute("content", root.dataset.skin === "pikachu" ? "#F7D948" : (mode === "light" ? "#efe7db" : "#07090d"));
     })();
   </script>
 </head>
@@ -95,12 +96,17 @@
           <input id="owner-pwd" type="password" autocomplete="current-password" placeholder="请输入密码" />
         </label>
         <button id="run-now" class="primary run-button" type="button">马上刷步 <span>→</span></button>
+        <button id="usage-now" type="button">查看用量</button>
       </div>
       <div class="owner-meta">
         <span>今日步数是华米当天；上次定时是仓库记下的上传，不是实时</span>
         <a href="./settings.html">改定时参数 →</a>
       </div>
       <p id="ops-status" class="banner" hidden></p>
+      <div id="usage-box" class="usage-box" hidden>
+        <p class="usage-summary muted" id="usage-summary"></p>
+        <ul class="usage-list" id="usage-list"></ul>
+      </div>
     </section>
 
     <section class="panel slim schedule-card">
@@ -147,7 +153,7 @@
   <script src="./schedule.js"></script>
   <script src="./guest-config.js"></script>
   <script src="./api.js"></script>
-  <script src="./theme.js?v=1"></script>
+  <script src="./theme.js?v=2"></script>
   <script src="./app.js"></script>
 </body>
 </html>
