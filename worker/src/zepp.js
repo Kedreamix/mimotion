@@ -29,9 +29,15 @@ export function stepRangeByTime(now = new Date(), minStep = 18000, maxStep = 250
   return { min, max };
 }
 
+export function clampStep(value) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(1, Math.min(98800, n));
+}
+
 export function pickStep(minStep, maxStep) {
-  const low = Math.max(1000, Number(minStep) || 18000);
-  const high = Math.min(98000, Math.max(low, Number(maxStep) || 25000));
+  const low = Math.max(1, Number(minStep) || 18000);
+  const high = Math.min(98800, Math.max(low, Number(maxStep) || 25000));
   return low + Math.floor(Math.random() * (high - low + 1));
 }
 
@@ -169,7 +175,7 @@ async function postBandData(step, appToken, userId, fetchImpl, now) {
   return body.message;
 }
 
-export async function guestSync({ user, password, minStep, maxStep, now, fetchImpl }) {
+export async function guestSync({ user, password, minStep, maxStep, step, now, fetchImpl }) {
   const account = normalizeUser(user);
   if (!account || !password) {
     throw new Error("请填写自己的 Zepp Life 账号和密码");
@@ -178,11 +184,15 @@ export async function guestSync({ user, password, minStep, maxStep, now, fetchIm
   const deviceId = uuid();
   const access = await loginAccessToken(account, password, fetchImpl);
   const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
+  const exact = step != null && step !== "" ? clampStep(step) : null;
+  if (step != null && step !== "" && exact == null) {
+    throw new Error("步数不正确");
+  }
   const range = (!minStep && !maxStep) ? stepRangeByTime(now) : {
     min: Number(minStep) || 18000,
     max: Number(maxStep) || 25000,
   };
-  const step = pickStep(range.min, range.max);
-  await postBandData(step, tokens.appToken, tokens.userId, fetchImpl, now);
-  return { step, user: maskUser(account) };
+  const chosen = exact ?? pickStep(range.min, range.max);
+  await postBandData(chosen, tokens.appToken, tokens.userId, fetchImpl, now);
+  return { step: chosen, user: maskUser(account) };
 }
