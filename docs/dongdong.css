@@ -121,6 +121,13 @@ html[data-theme="light"] .result.maybe {
   height: 28px;
   border-radius: 9px;
   background: conic-gradient(from 210deg, var(--orange), #ff9a62, #c8f542, var(--orange));
+  overflow: hidden;
+}
+.logo-mark {
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .brand strong { display: block; font-size: 15px; line-height: 1.1; }
 .brand small { display: block; color: var(--muted); font-size: 12px; }
@@ -329,10 +336,11 @@ h1 { margin: 8px 0 4px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.04
   background: transparent;
   color: var(--text);
   border-radius: 999px;
-  padding: 7px 12px;
+  padding: 9px 14px;
+  min-height: 40px;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 .chips button.on {
   border-color: transparent;
@@ -396,15 +404,15 @@ input:focus {
 }
 .go {
   width: 100%;
-  min-height: 48px;
-  margin: 4px 0 4px;
+  min-height: 52px;
+  margin: 8px 0 6px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--orange);
   color: var(--ink);
   font: inherit;
   font-weight: 750;
-  font-size: 16px;
+  font-size: 17px;
   cursor: pointer;
   box-shadow: 0 12px 28px rgba(255, 90, 31, 0.22);
 }
@@ -539,14 +547,17 @@ html[data-skin="pikachu"] .logo {
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
-  background: url("./assets/pikachu-mark.svg") center / cover no-repeat;
+  padding: 0;
+  overflow: hidden;
+  background: #1a1408;
   border-radius: 50%;
   box-shadow: 0 0 0 2px #ffd942, 0 0 0 4px rgba(227, 53, 13, .7), 0 9px 25px rgba(247, 217, 72, .25);
-  animation: spark-maibu-logo 2.8s ease-in-out infinite;
 }
-@keyframes spark-maibu-logo {
-  0%, 100% { filter: brightness(1); transform: translateY(0); }
-  50% { filter: brightness(1.13) drop-shadow(0 0 5px rgba(255, 218, 60, .5)); transform: translateY(-1px); }
+html[data-skin="pikachu"] .logo-mark {
+  display: block !important;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 html[data-skin="pikachu"] .play,
 html[data-skin="pikachu"] .guide,
