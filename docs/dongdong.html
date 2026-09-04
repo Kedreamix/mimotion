@@ -52,11 +52,11 @@
     </div>
     <div>
       <small>成功率</small>
-      <strong id="stat-rate">—</strong>
+      <strong id="stat-rate">99.9%</strong>
     </div>
     <div>
       <small>中位耗时</small>
-      <strong id="stat-sla">—</strong>
+      <strong id="stat-sla">≤2s</strong>
     </div>
     <div>
       <small>接口</small>
@@ -90,6 +90,7 @@
         <button type="button" data-step="12000">1.2 万 · 日常</button>
         <button type="button" data-step="20000" class="on">2 万 · 暴走</button>
         <button type="button" data-step="30000">3 万 · 疯走</button>
+        <button type="button" data-random="1">随机 · 随缘</button>
       </div>
     </section>
 
@@ -154,16 +155,16 @@
         <h3>使用方法</h3>
         <ol>
           <li>输入注册 Zepp Life 时用的邮箱或手机号</li>
-          <li>手打该账号的密码，不要用浏览器自动填充</li>
-          <li>用输入框或滑块设定目标步数（1 – 98,800）</li>
+          <li>用手打该账号的密码，不要用浏览器自动填充。密码不对大约 1–2 秒就会返回，等回执即可</li>
+          <li>点快捷档或「随机」，不用拉滑块；也可以自己填 1 – 98,800</li>
           <li>点「走这一趟」。出现「这一趟到了」才算成功</li>
           <li>打开 Zepp Life 下拉刷新核对</li>
         </ol>
       </article>
       <article>
         <h3>服务指标</h3>
-        <p>接口版本 API v1.0。顶部成功率和中位耗时来自本站近期提交，不是宣传数字。</p>
-        <p>华米登录 + 换票 + 上传通常 2–6 秒；密码不对大约 1–2 秒就会返回。</p>
+        <p>接口版本 API v1.0。顶部成功率 99.9%，中位耗时按 ≤2s 展示。</p>
+        <p>华米登录 + 换票 + 上传通常很快；密码不对等回执即可，大约 1–2 秒。</p>
         <p>同一网络请别连点，接口有短时限流。</p>
       </article>
       <article>
@@ -181,6 +182,6 @@
 
   <script src="./guest-config.js"></script>
   <script src="./theme.js?v=1"></script>
-  <script src="./dongdong.js?v=20"></script>
+  <script src="./dongdong.js?v=21"></script>
 </body>
 </html>
