@@ -58,11 +58,17 @@ html[data-theme="light"] input[type="number"] {
   background: rgba(28, 20, 15, 0.04);
 }
 html[data-theme="light"] .track {
-  stroke: rgba(28, 20, 15, 0.28);
+  stroke: #8d7460;
+  stroke-width: 12;
 }
 html[data-theme="light"] .ring {
-  stroke: #c43d0e;
-  filter: drop-shadow(0 0 6px rgba(196, 61, 14, 0.22));
+  stroke: #c43200;
+  stroke-width: 12;
+  filter: none;
+}
+html[data-theme="light"] .watch.done .ring {
+  stroke: #0f7a48;
+  filter: none;
 }
 html[data-theme="light"] .metrics .live {
   background: transparent;
@@ -92,9 +98,6 @@ html[data-theme="light"] .result.bad {
 html[data-theme="light"] .result.maybe {
   border-color: rgba(154, 107, 0, 0.28);
   background: rgba(154, 107, 0, 0.08);
-}
-html[data-theme="light"] .watch.done .ring {
-  filter: drop-shadow(0 0 10px rgba(18, 138, 82, 0.28));
 }
 
 .top, .guide { width: min(980px, calc(100% - 28px)); margin: 0 auto; }
