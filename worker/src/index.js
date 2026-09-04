@@ -2,6 +2,7 @@ import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
 import { guestSync, maskUser, normalizeUser } from "./zepp.js";
+import { hydrateStats, publicStats, recordGuest } from "./stats.js";
 
 async function triggerWorkflowDispatch({ repo, pat, workflowId = "run.yml", inputs = {}, fetchImpl = fetch }) {
   const [owner, repoName] = repo.split("/");
@@ -132,15 +133,16 @@ function ownerSecretStatus(env) {
   return { hasPassword, hasPat, configured: hasPassword };
 }
 
-export async function handleRequest(request, env = {}, fetchImpl = fetch) {
+export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = null) {
   const origin = request.headers.get("Origin") || "";
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/$/, "") || "/";
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
   }
-  if (request.method === "GET" && (path === "/" || path === "/health")) {
-    return json({ ok: true, service: "mimotion-guest", api: "v1.0" }, 200, origin, env);
+  if (request.method === "GET" && (path === "/" || path === "/health" || path === "/guest-stats")) {
+    await hydrateStats();
+    return json({ ok: true, service: "mimotion-guest", api: "v1.0", stats: publicStats() }, 200, origin, env);
   }
   if (request.method === "GET" && path === "/owner-status") {
     return json({ ok: true, ...ownerSecretStatus(env) }, 200, origin, env);
@@ -246,6 +248,9 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
           elapsed_ms: result.elapsed_ms,
           trace: result.trace,
         });
+        if (passwordLen > 0) {
+          await recordGuest(ctx, { ok: true, elapsed_ms: result.elapsed_ms });
+        }
       } catch (err) {
         logGuest({
           ok: false,
@@ -257,6 +262,9 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
           elapsed_ms: err.elapsed_ms,
           trace: err.trace,
         });
+        if (passwordLen > 0) {
+          await recordGuest(ctx, { ok: false, elapsed_ms: err.elapsed_ms });
+        }
         throw err;
       }
     }
@@ -281,7 +289,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
 }
 
 export default {
-  async fetch(request, env) {
-    return handleRequest(request, env, fetch);
+  async fetch(request, env, ctx) {
+    return handleRequest(request, env, fetch, ctx);
   },
 };

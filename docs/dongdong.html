@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark light" />
   <meta name="theme-color" content="#07090d" />
-  <title>动动吧 · mimotion 一次性刷步</title>
-  <meta name="description" content="今天走几步？填自己的 Zepp Life 账号，走一趟就结束。不定时、不入库。" />
+  <title>迈步 · mimotion 一次性刷步</title>
+  <meta name="description" content="迈步：填自己的 Zepp Life 账号，指定步数，走一趟就结束。不定时、不入库。" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./dongdong.css" />
 </head>
@@ -16,24 +16,42 @@
     <a class="brand" href="./">
       <span class="logo" aria-hidden="true"></span>
       <span>
-        <strong>mimotion</strong>
-        <small>一次性刷步</small>
+        <strong>迈步</strong>
+        <small>mimotion 一次性刷步</small>
       </span>
     </a>
     <nav class="nav" aria-label="页面">
       <a href="./">看板</a>
-      <a href="./dongdong.html" class="active">动动吧</a>
+      <a href="./dongdong.html" class="active">迈步</a>
       <a href="./settings.html">参数</a>
     </nav>
     <div class="top-actions">
-      <span id="api-live" class="live">接口检测中</span>
       <button id="theme-btn" type="button" title="切换深浅色">浅色</button>
     </div>
   </header>
 
+  <section class="metrics" aria-label="服务指标">
+    <div>
+      <small>API</small>
+      <strong id="api-ver">v1.0</strong>
+    </div>
+    <div>
+      <small>成功率</small>
+      <strong id="stat-rate">—</strong>
+    </div>
+    <div>
+      <small>中位耗时</small>
+      <strong id="stat-sla">—</strong>
+    </div>
+    <div>
+      <small>接口</small>
+      <strong id="api-live" class="live">检测中</strong>
+    </div>
+  </section>
+
   <main class="play">
     <section class="watch" aria-label="目标步数">
-      <p class="kicker">TODAY · 自己走一趟</p>
+      <p class="kicker">TODAY · 步数更新</p>
       <h1>今天走几步？</h1>
       <div class="dial" aria-hidden="true">
         <svg viewBox="0 0 140 140">
@@ -105,17 +123,45 @@
     </section>
   </main>
 
-  <details class="about">
-    <summary>这页和看板有什么不一样？</summary>
-    <div>
-      <p>看板是站长的定时自动刷步。动动吧是给路过的人：自己填号，指定步数，点一次就同步。</p>
-      <p>步数范围 1 – 98,800。同一网络请别连点，接口有短时限流。</p>
-      <p>提交记录在 Cloudflare Worker 日志里，不在 GitHub Actions。打开 Cloudflare → Workers → mimotion → Observability / Logs，搜 guest-run。只会看到脱敏账号和密码位数，看不到密码。</p>
-      <p>电脑上也可以按 F12 → Network，点 guest-run 看这一次的回包。</p>
+  <section class="guide" id="about">
+    <p class="kicker">ABOUT</p>
+    <h2>关于迈步</h2>
+    <p class="guide-lead">工具说明与使用方法。迈步通过 API 把你指定的步数交给华米，用来更新 Zepp Life 里今天的步数。</p>
+    <div class="guide-grid">
+      <article>
+        <h3>功能介绍</h3>
+        <p>输入自己的账号、密码和目标步数，由 Worker 直连华米登录并上传。不定时、不入库，走完这一趟就结束。</p>
+      </article>
+      <article>
+        <h3>使用方法</h3>
+        <ol>
+          <li>输入注册 Zepp Life 时用的邮箱或手机号</li>
+          <li>手打该账号的密码，不要用浏览器自动填充</li>
+          <li>用输入框或滑块设定目标步数（1 – 98,800）</li>
+          <li>点「走这一趟」。出现「这一趟到了」才算成功</li>
+          <li>打开 Zepp Life 下拉刷新核对</li>
+        </ol>
+      </article>
+      <article>
+        <h3>服务指标</h3>
+        <p>接口版本 API v1.0。顶部成功率和中位耗时来自本站近期提交，不是宣传数字。</p>
+        <p>华米登录 + 换票 + 上传通常 2–6 秒；密码不对大约 1–2 秒就会返回。</p>
+        <p>同一网络请别连点，接口有短时限流。</p>
+      </article>
+      <article>
+        <h3>注意事项</h3>
+        <ul>
+          <li>仅供学习、测试，请只动自己的号</li>
+          <li>不要把步数拉得太离谱，以免被判定异常</li>
+          <li>账号密码只用于这一次请求，页面和 Worker 都不保存</li>
+          <li>要用 Zepp Life 密码，不是小米账号快捷登录，也不是看板站长密码</li>
+        </ul>
+      </article>
     </div>
-  </details>
+    <p class="disclaimer">免责声明：本工具仅供学习交流。使用后果由用户自行承担。请遵守相关法律法规，不得用于非法用途。开发者不对因使用本工具造成的任何直接或间接损失负责。</p>
+  </section>
 
   <script src="./guest-config.js"></script>
-  <script src="./dongdong.js?v=17"></script>
+  <script src="./dongdong.js?v=18"></script>
 </body>
 </html>

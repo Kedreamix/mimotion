@@ -3,6 +3,7 @@ import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
+import { resetStatsForTests } from "../worker/src/stats.js";
 import { applyBandTemplate, clampStep, describeLoginError, formBody, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
 
@@ -42,7 +43,7 @@ test("normalize phone and mask user", () => {
 });
 
 test("describeLoginError turns Huami 401 into a password hint", () => {
-  assert.match(describeLoginError("401"), /账号或密码不对/);
+  assert.match(describeLoginError("401"), /请检查密码/);
   assert.match(describeLoginError("oops"), /oops/);
 });
 
@@ -225,7 +226,7 @@ test("guest handler maps Huami login 401 to a password error", async () => {
   assert.equal(payload.status, 400);
   assert.equal(payload.body.ok, false);
   assert.equal(payload.body.stage, "login");
-  assert.match(payload.body.error, /账号或密码不对/);
+  assert.match(payload.body.error, /请检查密码/);
   assert.equal(payload.body.received.user, maskUser("a@b.com"));
   assert.equal(payload.body.received.password_len, 5);
   assert.equal(JSON.stringify(payload.body).includes("wrong"), false);
@@ -257,6 +258,59 @@ test("guest handler writes audit log without the password", async () => {
   assert.match(dumped, /"ok":false/);
   assert.match(dumped, /"password_len":17/);
   assert.equal(dumped.includes("super-secret-pass"), false);
+});
+
+test("guest stats count success and failure rates", async () => {
+  resetStatsForTests();
+  const okFetch = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
+  await handleRequest(new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "guest-stat-ok" },
+    body: JSON.stringify({ user: "a@b.com", password: "secret", step: 3000 }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }, okFetch);
+
+  const failFetch = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?error=401&" },
+    },
+  ]);
+  await handleRequest(new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "guest-stat-fail" },
+    body: JSON.stringify({ user: "a@b.com", password: "wrong", step: 3000 }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }, failFetch);
+
+  const payload = await read(await handleRequest(new Request("https://guest.test/guest-stats", {
+    headers: { Origin: "https://kedreamix.github.io" },
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.api, "v1.0");
+  assert.equal(payload.body.stats.ok, 1);
+  assert.equal(payload.body.stats.fail, 1);
+  assert.equal(payload.body.stats.total, 2);
+  assert.equal(payload.body.stats.success_rate, 50);
 });
 
 test("guest handler returns huami-wait when Huami never answers", async () => {
