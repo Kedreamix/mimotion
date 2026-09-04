@@ -262,9 +262,9 @@
     const button = $("run-now");
     button.disabled = true;
     button.innerHTML = "正在刷步…";
-    showOps("正在验证密码，通过后触发 GitHub Actions 刷步…", true);
+    showOps("正在验证密码…", true);
     try {
-      if (!endpoint) throw new Error("刷步接口还没部署，请先配置 Cloudflare Worker。");
+      if (!endpoint) throw new Error("刷步接口暂不可用。");
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-run`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -281,7 +281,7 @@
       $("owner-pwd").value = "";
       const msg = String(err.message || err);
       showOps(msg.includes("Failed to fetch") || msg.includes("Load failed")
-        ? "刷步接口暂不可用，请确认 Cloudflare Worker 已部署，并配置了 OWNER_PASSWORD，以及把仓库里已有的 PAT 复制到 Worker。"
+        ? "刷步接口暂不可用，请稍后再试。"
         : msg, false);
     } finally {
       button.disabled = false;
@@ -296,7 +296,6 @@
 
   async function checkOwnerSetup() {
     const ready = $("account-ready");
-    const setup = $("owner-setup");
     const endpoint = window.MIMO_GUEST_API;
     if (!endpoint) return;
     try {
@@ -304,11 +303,9 @@
       if (!res.ok) return;
       const body = await res.json().catch(() => ({}));
       if (!body.configured) {
-        ready.textContent = "还没设置站长密码，先去 Cloudflare Worker 添加 OWNER_PASSWORD";
-        if (setup) setup.open = true;
+        ready.textContent = "站长刷步还没配置完成。";
       } else if (!body.hasPat) {
-        ready.textContent = "密码已设。把仓库 Secrets 里已有的 PAT 复制到 Worker 即可，不用新申请";
-        if (setup) setup.open = true;
+        ready.textContent = "刷步接口还没配置完成。";
       }
     } catch {
       /* Worker 未部署时静默忽略，用户还是可以尝试输密码 */
