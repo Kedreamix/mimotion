@@ -327,7 +327,8 @@ input:focus {
   font-size: 13px;
   line-height: 1.65;
 }
-.receipt-note { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.receipt-note { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.receipt-trace { margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.5; font-variant-numeric: tabular-nums; }
 #again {
   width: 100%;
   min-height: 44px;

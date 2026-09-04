@@ -28,7 +28,7 @@ async function triggerWorkflowDispatch({ repo, pat, workflowId = "run.yml", inpu
 }
 
 const limiterStore = new Map();
-const limiter = createLimiter(limiterStore, { limit: 5, windowMs: 10 * 60 * 1000 });
+const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
 
 const DEFAULT_PAGES_ORIGIN = "https://kedreamix.github.io/mimotion";
 
@@ -209,9 +209,17 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
       step: result.step,
       user: result.user,
       message: `已为 ${result.user} 同步 ${result.step} 步`,
+      elapsed_ms: result.elapsed_ms,
+      trace: result.trace || [],
     }, 200, origin, env);
   } catch (err) {
-    return json({ ok: false, error: String(err.message || err) }, 400, origin, env);
+    return json({
+      ok: false,
+      error: String(err.message || err),
+      stage: err.stage || "worker",
+      elapsed_ms: err.elapsed_ms,
+      trace: err.trace || [],
+    }, 400, origin, env);
   }
 }
 

@@ -61,7 +61,7 @@ function formBody(data) {
   return new URLSearchParams(data).toString();
 }
 
-async function timedFetch(fetchImpl, url, options, ms = 8000) {
+async function timedFetch(fetchImpl, url, options, ms = 12000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
@@ -195,19 +195,47 @@ export async function guestSync({ user, password, minStep, maxStep, step, now, f
   if (!account || !password) {
     throw new Error("请填写自己的 Zepp Life 账号和密码");
   }
-  const isPhone = account.startsWith("+86");
-  const deviceId = uuid();
-  const access = await loginAccessToken(account, password, fetchImpl);
-  const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
-  const exact = step != null && step !== "" ? clampStep(step) : null;
-  if (step != null && step !== "" && exact == null) {
-    throw new Error("步数不正确");
-  }
-  const range = (!minStep && !maxStep) ? stepRangeByTime(now) : {
-    min: Number(minStep) || 18000,
-    max: Number(maxStep) || 25000,
+  const started = Date.now();
+  const trace = [];
+  let stage = "prepare";
+  let last = started;
+  const stamp = (name) => {
+    const t = Date.now();
+    trace.push({ stage: name, ms: t - last });
+    last = t;
+    stage = name;
   };
-  const chosen = exact ?? pickStep(range.min, range.max);
-  await postBandData(chosen, tokens.appToken, tokens.userId, fetchImpl, now);
-  return { step: chosen, user: maskUser(account) };
+  try {
+    const isPhone = account.startsWith("+86");
+    const deviceId = uuid();
+    stage = "login";
+    const access = await loginAccessToken(account, password, fetchImpl);
+    stamp("login");
+    stage = "grant";
+    const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
+    stamp("grant");
+    const exact = step != null && step !== "" ? clampStep(step) : null;
+    if (step != null && step !== "" && exact == null) {
+      throw new Error("步数不正确");
+    }
+    const range = (!minStep && !maxStep) ? stepRangeByTime(now) : {
+      min: Number(minStep) || 18000,
+      max: Number(maxStep) || 25000,
+    };
+    const chosen = exact ?? pickStep(range.min, range.max);
+    stage = "upload";
+    await postBandData(chosen, tokens.appToken, tokens.userId, fetchImpl, now);
+    stamp("upload");
+    return {
+      step: chosen,
+      user: maskUser(account),
+      trace,
+      elapsed_ms: Date.now() - started,
+    };
+  } catch (err) {
+    err.stage = stage;
+    err.trace = trace;
+    err.elapsed_ms = Date.now() - started;
+    throw err;
+  }
 }
