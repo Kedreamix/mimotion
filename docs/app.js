@@ -294,55 +294,24 @@
     if (event.key === "Enter") runOwner();
   });
 
-  function showGuest(text, ok) {
-    const el = $("guest-status");
-    el.hidden = false;
-    el.className = "banner " + (ok ? "ok" : "bad");
-    el.textContent = text;
+  async function checkOwnerSetup() {
+    const ready = $("account-ready");
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) return;
+    try {
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/owner-status`);
+      if (!res.ok) return;
+      const body = await res.json().catch(() => ({}));
+      if (!body.configured) {
+        ready.textContent = "站长刷步还没配置完成。";
+      } else if (!body.hasPat) {
+        ready.textContent = "刷步接口还没配置完成。";
+      }
+    } catch {
+      /* Worker 未部署时静默忽略，用户还是可以尝试输密码 */
+    }
   }
 
-  $("guest-run").addEventListener("click", async () => {
-    const user = ($("guest-user").value || "").trim();
-    const password = $("guest-pwd").value || "";
-    if (!user || !password) {
-      showGuest("请填写你自己的 Zepp Life 账号和密码。", false);
-      return;
-    }
-    const endpoint = window.MIMO_GUEST_API;
-    if (!endpoint) {
-      showGuest("游客接口还没部署。", false);
-      return;
-    }
-    const payload = { user, password };
-    const min = ($("guest-min").value || "").trim();
-    const max = ($("guest-max").value || "").trim();
-    if (min) payload.min_step = Number(min);
-    if (max) payload.max_step = Number(max);
-    $("guest-run").disabled = true;
-    showGuest("正在提交到游客接口，不会写入仓库。", true);
-    try {
-      const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = await res.json().catch(() => ({}));
-      $("guest-pwd").value = "";
-      if (!res.ok || !body.ok) {
-        showGuest(body.error || `游客刷步失败（${res.status}）`, false);
-        return;
-      }
-      showGuest(body.message || `已同步 ${body.step} 步`, true);
-    } catch (err) {
-      $("guest-pwd").value = "";
-      const msg = String(err.message || err);
-      showGuest(msg.includes("Failed to fetch") || msg.includes("Load failed")
-        ? "游客刷步接口暂不可用，请稍后再试。"
-        : msg, false);
-    } finally {
-      $("guest-run").disabled = false;
-    }
-  });
-
+  checkOwnerSetup();
   refresh();
 })();

@@ -1,18 +1,18 @@
 trigger by: workflow_run
 current system time:
-UTC: 26-09-03 12:15:35
-北京时间: 26-09-03 20:15:35
+UTC: 26-09-03 18:06:18
+北京时间: 26-09-04 02:06:18
 current cron:
-UTC时间: '47 1,4,7,10,12,14 * * *'
-北京时间: '47 9,12,15,18,20,22 * * *'
-next cron:
 UTC时间: '50 1,4,7,10,14 * * *'
 北京时间: '50 9,12,15,18,22 * * *'
-next exec time: UTC(14:50) 北京时间(22:50)
+next cron:
+UTC时间: '21 1,4,7,10,12,14 * * *'
+北京时间: '21 9,12,15,18,20,22 * * *'
+next exec time: UTC(1:21) 北京时间(9:21)
 ---STEP_STATE---
 {
   "2febc6aded165332e2ca87a31a9be7bf": {
-    "last_step": 10601,
-    "last_step_date": "2026-09-03"
+    "last_step": 1410,
+    "last_step_date": "2026-09-04"
   }
 }

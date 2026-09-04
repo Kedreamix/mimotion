@@ -87,6 +87,7 @@ async function runSync(user, password, body, fetchImpl) {
     password,
     minStep: body.min_step,
     maxStep: body.max_step,
+    step: body.step,
     now: new Date(),
     fetchImpl,
   });
@@ -110,7 +111,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
     return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
   }
   if (request.method === "GET" && (path === "/" || path === "/health")) {
-    return json({ ok: true, service: "mimotion-guest" }, 200, origin, env);
+    return json({ ok: true, service: "mimotion-guest", api: "v1.0" }, 200, origin, env);
   }
   if (request.method === "GET" && path === "/owner-status") {
     return json({ ok: true, ...ownerSecretStatus(env) }, 200, origin, env);
