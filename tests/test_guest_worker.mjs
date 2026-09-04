@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
-import { handleRequest } from "../worker/src/index.js";
+import { handleRequest, TODAY_STEPS_CACHE_URL } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
 import { resetStatsForTests } from "../worker/src/stats.js";
-import { applyBandTemplate, clampStep, describeLoginError, formBody, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
+import { applyBandTemplate, clampStep, describeLoginError, formBody, maskUser, normalizeUser, parseSummarySteps, regionHostFromLogin, stepRangeByTime, stepsFromBandData, todayBeijing } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
 
 const PYTHON_PLAIN = "emailOrPhone=%2B8613800138000&password=secret&state=REDIRECTION&client_id=HuaMi&country_code=CN&token=access&redirect_uri=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fhm-registration%2Fsuccesssignin.html";
@@ -83,6 +83,36 @@ test("band template injects date and step", () => {
   assert.match(out, /ttl%5C%22%3A12345%2C%5C%22dis/);
 });
 
+test("parseSummarySteps reads stp.ttl from base64 JSON and raw JSON string", () => {
+  const payload = { stp: { ttl: 54188, dis: 36000 } };
+  const b64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+  assert.equal(parseSummarySteps(b64), 54188);
+  assert.equal(parseSummarySteps(JSON.stringify(payload)), 54188);
+  assert.equal(parseSummarySteps(payload), 54188);
+  assert.equal(parseSummarySteps('{"stp":{"ttl":888}}'), 888);
+});
+
+test("stepsFromBandData matches Beijing date and falls back to first row", () => {
+  const body = {
+    code: 1,
+    message: "success",
+    data: [
+      { date: "2026-09-03", summary: JSON.stringify({ stp: { ttl: 100 } }) },
+      { date: "2026-09-04", summary: Buffer.from(JSON.stringify({ stp: { ttl: 2222 } })).toString("base64") },
+    ],
+  };
+  assert.equal(stepsFromBandData(body, "2026-09-04"), 2222);
+  assert.equal(stepsFromBandData({ data: [] }, "2026-09-04"), 0);
+});
+
+test("regionHostFromLogin uses login mapping and otherwise the upload host", () => {
+  assert.equal(regionHostFromLogin({}), "https://api-mifit-cn.huami.com");
+  assert.equal(
+    regionHostFromLogin({ domains: { "api-mifit.huami.com": "api-mifit-cn.huami.com" } }),
+    "https://api-mifit-cn.huami.com",
+  );
+});
+
 test("rate limiter blocks the sixth call", () => {
   const check = createLimiter(new Map(), { limit: 5, windowMs: 60_000 });
   const now = 1_000;
@@ -97,11 +127,62 @@ function mockFetch(plan) {
     assert.ok(item, `unexpected fetch ${url}`);
     if (item.expectUrl) assert.match(String(url), item.expectUrl);
     if (item.expectMethod) assert.equal(options.method, item.expectMethod);
+    if (item.expectHeader) {
+      for (const [key, value] of Object.entries(item.expectHeader)) {
+        assert.equal(options.headers[key], value);
+      }
+    }
     return new Response(item.body ?? null, {
       status: item.status,
       headers: item.headers || { "content-type": "application/json" },
     });
   };
+}
+
+function memoryCache() {
+  const store = new Map();
+  const keyOf = (req) => (typeof req === "string" ? req : req.url);
+  return {
+    async match(req) {
+      const hit = store.get(keyOf(req));
+      return hit ? hit.clone() : undefined;
+    },
+    async put(req, res) {
+      store.set(keyOf(req), res.clone());
+    },
+    async delete(req) {
+      return store.delete(keyOf(req));
+    },
+  };
+}
+
+function huamiReadPlan(steps, date = todayBeijing()) {
+  const summary = Buffer.from(JSON.stringify({ stp: { ttl: steps } }), "utf8").toString("base64");
+  return [
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "app-token", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /api-mifit-cn\.huami\.com\/v1\/data\/band_data\.json\?.*query_type=summary/,
+      expectMethod: "GET",
+      expectHeader: { apptoken: "app-token", appname: "com.xiaomi.hm.health" },
+      status: 200,
+      body: JSON.stringify({
+        code: 1,
+        message: "success",
+        data: [{ date, summary }],
+      }),
+    },
+  ];
 }
 
 async function read(res) {
@@ -526,4 +607,107 @@ test("oauth token exchanges code and does not leak client secret", async () => {
   assert.equal(payload.status, 200);
   assert.equal(payload.body.token, "gho_test_token");
   assert.equal(JSON.stringify(payload.body).includes("super-secret"), false);
+});
+
+function todayStepsRequest(query = "") {
+  return new Request(`https://guest.test/today-steps${query}`, {
+    headers: { Origin: "https://kedreamix.github.io" },
+  });
+}
+
+test("GET /today-steps returns 503 without CONFIG", async () => {
+  const payload = await read(await handleRequest(todayStepsRequest(), {
+    ALLOWED_ORIGINS: "https://kedreamix.github.io",
+  }));
+  assert.equal(payload.status, 503);
+  assert.equal(payload.body.ok, false);
+  assert.equal(JSON.stringify(payload.body).includes("secret"), false);
+});
+
+test("GET /today-steps reads Huami summary, caches, and honors fresh=1", async () => {
+  const cache = memoryCache();
+  const env = ownerEnv({ USER: "a@b.com", PWD: "zepp-secret" });
+  const first = await read(await handleRequest(
+    todayStepsRequest(),
+    env,
+    mockFetch(huamiReadPlan(54188)),
+    { cache },
+  ));
+  assert.equal(first.status, 200);
+  assert.equal(first.body.ok, true);
+  assert.equal(first.body.steps, 54188);
+  assert.equal(first.body.source, "huami");
+  assert.equal(first.body.date, todayBeijing());
+  assert.equal(JSON.stringify(first.body).includes("zepp-secret"), false);
+
+  const cached = await read(await handleRequest(
+    todayStepsRequest(),
+    env,
+    mockFetch([]),
+    { cache },
+  ));
+  assert.equal(cached.status, 200);
+  assert.equal(cached.body.steps, 54188);
+
+  const fresh = await read(await handleRequest(
+    todayStepsRequest("?fresh=1"),
+    env,
+    mockFetch(huamiReadPlan(999)),
+    { cache },
+  ));
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.body.steps, 999);
+});
+
+test("GET /today-steps CORS matches other public GET routes", async () => {
+  const res = await handleRequest(todayStepsRequest(), ownerEnv({ USER: "a@b.com", PWD: "zepp" }), mockFetch(huamiReadPlan(12)));
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://kedreamix.github.io");
+  const payload = await read(res);
+  assert.equal(payload.body.steps, 12);
+});
+
+test("owner-run updates today-steps cache", async () => {
+  const cache = memoryCache();
+  await cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify({
+    ok: true,
+    date: todayBeijing(),
+    steps: 100,
+    source: "huami",
+  }), {
+    headers: { "content-type": "application/json", "Cache-Control": "public, max-age=180" },
+  }));
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
+  const res = await handleRequest(
+    ownerRequest({ password: "secret", step: 12000 }, "ip-owner-cache"),
+    ownerEnv({ USER: "13800138000", PWD: "zepp-secret" }),
+    fetchImpl,
+    { cache },
+  );
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  const hit = await cache.match(TODAY_STEPS_CACHE_URL);
+  const cached = JSON.parse(await hit.text());
+  assert.equal(cached.ok, true);
+  assert.equal(cached.steps, 12000);
+  assert.equal(cached.source, "huami");
+  assert.equal(cached.date, todayBeijing());
 });

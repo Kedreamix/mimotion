@@ -2,8 +2,11 @@ import { parseOwnerAccounts } from "./config.js";
 import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
-import { guestSync, maskUser, normalizeUser, stepRangeByTime } from "./zepp.js";
+import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, todayBeijing } from "./zepp.js";
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
+
+export const TODAY_STEPS_CACHE_URL = "https://mimotion.internal/today-steps";
+export const TODAY_STEPS_TTL_SECONDS = 180;
 
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
@@ -111,6 +114,62 @@ function ownerSecretStatus(env) {
   return { hasPassword, hasAccount, hasConfig: hasAccount, configured: hasPassword };
 }
 
+function resolveCache(ctx) {
+  if (ctx && ctx.cache) return ctx.cache;
+  if (typeof caches === "undefined") return null;
+  try {
+    return caches.default;
+  } catch {
+    return null;
+  }
+}
+
+function todayStepsPayload(date, steps) {
+  return {
+    ok: true,
+    date,
+    steps: Number(steps) || 0,
+    source: "huami",
+  };
+}
+
+async function matchTodayStepsCache(cache) {
+  if (!cache) return null;
+  try {
+    const hit = await cache.match(TODAY_STEPS_CACHE_URL);
+    if (!hit) return null;
+    const body = await hit.json();
+    if (!body || body.ok !== true) return null;
+    return body;
+  } catch {
+    return null;
+  }
+}
+
+async function putTodayStepsCache(cache, payload, ctx) {
+  if (!cache) return;
+  try {
+    const persist = cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify(payload), {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "Cache-Control": `public, max-age=${TODAY_STEPS_TTL_SECONDS}`,
+      },
+    }));
+    if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(persist);
+    else await persist;
+  } catch {
+    /* Cache API 不可用时忽略 */
+  }
+}
+
+async function readOwnerConfig(env) {
+  try {
+    return { cfg: parseOwnerAccounts(env), error: null };
+  } catch (err) {
+    return { cfg: null, error: String(err.message || err) };
+  }
+}
+
 export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = null) {
   const origin = request.headers.get("Origin") || "";
   const url = new URL(request.url);
@@ -124,6 +183,40 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
   }
   if (request.method === "GET" && path === "/owner-status") {
     return json({ ok: true, ...ownerSecretStatus(env) }, 200, origin, env);
+  }
+  if (request.method === "GET" && path === "/today-steps") {
+    const cache = resolveCache(ctx);
+    const fresh = url.searchParams.get("fresh") === "1";
+    if (!fresh) {
+      const cached = await matchTodayStepsCache(cache);
+      if (cached) return json(cached, 200, origin, env);
+    }
+    const { cfg, error } = await readOwnerConfig(env);
+    if (error) return json({ ok: false, error }, 503, origin, env);
+    if (!cfg) {
+      return json({
+        ok: false,
+        error: "今日步数还差 Worker 里的 CONFIG。把仓库那份 JSON 贴进去即可。",
+      }, 503, origin, env);
+    }
+    try {
+      const account = cfg.accounts[0];
+      const result = await fetchTodaySteps({
+        user: account.user,
+        password: account.password,
+        now: new Date(),
+        fetchImpl,
+      });
+      const payload = todayStepsPayload(result.date, result.steps);
+      await putTodayStepsCache(cache, payload, ctx);
+      return json(payload, 200, origin, env);
+    } catch (err) {
+      return json({
+        ok: false,
+        error: String(err.message || err),
+        stage: err.stage || "today-steps",
+      }, 400, origin, env);
+    }
   }
   if (request.method === "GET" && path === "/oauth/config") {
     return json({
@@ -236,6 +329,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
           ? `已为 ${last.user} 同步 ${last.step} 步`
           : `已为 ${results.length} 个账号同步，最近 ${last.step} 步`,
       };
+      await putTodayStepsCache(resolveCache(ctx), todayStepsPayload(todayBeijing(now), last.step), ctx);
     } else {
       const receivedUser = maskUser(normalizeUser(body.user));
       const passwordLen = String(body.password || "").trim().length;

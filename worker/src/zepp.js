@@ -57,12 +57,98 @@ export function pickStep(minStep, maxStep) {
   return low + Math.floor(Math.random() * (high - low + 1));
 }
 
+export const DEFAULT_BAND_HOST = "https://api-mifit-cn.huami.com";
+
 export function todayBeijing(now = new Date()) {
   const bj = new Date(now.getTime() + 8 * 3600 * 1000);
   const y = bj.getUTCFullYear();
   const m = String(bj.getUTCMonth() + 1).padStart(2, "0");
   const d = String(bj.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+export function regionHostFromLogin(body) {
+  const domains = body && body.domains;
+  if (domains && typeof domains === "object") {
+    const mapped = domains["api-mifit.huami.com"] || domains["api-mifit.zepp.com"];
+    if (typeof mapped === "string" && mapped.trim()) {
+      const host = mapped.trim().replace(/\/$/, "");
+      if (/^https?:\/\//i.test(host)) return host;
+      return `https://${host}`;
+    }
+  }
+  return DEFAULT_BAND_HOST;
+}
+
+function tryJson(text) {
+  try {
+    let value = JSON.parse(text);
+    if (typeof value === "string") {
+      try {
+        value = JSON.parse(value);
+      } catch {
+        /* keep the first parse */
+      }
+    }
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function decodeBase64Utf8(raw) {
+  const normalized = String(raw || "").replace(/\s/g, "").replace(/-/g, "+").replace(/_/g, "/");
+  if (!normalized) return "";
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  const bin = atob(padded);
+  const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+function ttlFromObject(obj) {
+  if (obj == null) return null;
+  if (typeof obj === "number" && Number.isFinite(obj)) return Math.max(0, Math.floor(obj));
+  if (typeof obj !== "object") return null;
+  const stp = obj.stp;
+  if (typeof stp === "number" && Number.isFinite(stp)) return Math.max(0, Math.floor(stp));
+  if (stp && typeof stp === "object") {
+    const n = Number(stp.ttl ?? stp.total ?? stp.step);
+    if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  }
+  const n = Number(obj.ttl);
+  if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  return null;
+}
+
+export function parseSummarySteps(summary) {
+  if (summary == null || summary === "") return null;
+  if (typeof summary === "number" && Number.isFinite(summary)) return Math.max(0, Math.floor(summary));
+  if (typeof summary === "object") return ttlFromObject(summary);
+  const text = String(summary).trim();
+  if (!text) return null;
+  const asJson = tryJson(text);
+  if (asJson != null) {
+    const fromJson = ttlFromObject(asJson);
+    if (fromJson != null) return fromJson;
+  }
+  try {
+    const decoded = decodeBase64Utf8(text);
+    const nested = tryJson(decoded);
+    if (nested != null) return ttlFromObject(nested);
+  } catch {
+    /* not base64 */
+  }
+  return null;
+}
+
+export function stepsFromBandData(body, date) {
+  const rows = Array.isArray(body && body.data) ? body.data : [];
+  if (!rows.length) return 0;
+  const wanted = String(date || "");
+  const row = rows.find((item) => String(item.date || item.date_time || "") === wanted) || rows[0];
+  const steps = parseSummarySteps(row && row.summary);
+  if (steps == null) throw new Error("无法解析华米当日步数");
+  return steps;
 }
 
 function beijingTs(now = new Date()) {
@@ -190,6 +276,7 @@ async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
     loginToken: body.token_info.login_token,
     appToken: body.token_info.app_token,
     userId: body.token_info.user_id,
+    regionHost: regionHostFromLogin(body),
   };
 }
 
@@ -212,6 +299,47 @@ async function postBandData(step, appToken, userId, fetchImpl, now) {
     throw new Error(body.message || "提交失败");
   }
   return body.message;
+}
+
+export async function fetchTodaySteps({ user, password, now, fetchImpl }) {
+  const account = normalizeUser(user);
+  const pwd = String(password || "").trim();
+  if (!account || !pwd) {
+    throw new Error("请填写自己的 Zepp Life 账号和密码");
+  }
+  const isPhone = account.startsWith("+86");
+  const deviceId = uuid();
+  const access = await loginAccessToken(account, pwd, fetchImpl);
+  const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
+  const date = todayBeijing(now);
+  const host = tokens.regionHost || DEFAULT_BAND_HOST;
+  const query = new URLSearchParams({
+    query_type: "summary",
+    userid: String(tokens.userId),
+    from_date: date,
+    to_date: date,
+  });
+  const res = await timedFetch(fetchImpl, `${host}/v1/data/band_data.json?${query}`, {
+    method: "GET",
+    headers: {
+      apptoken: tokens.appToken,
+      appname: "com.xiaomi.hm.health",
+    },
+  });
+  if (res.status !== 200) {
+    throw new Error(`读取步数异常：${res.status}`);
+  }
+  const body = await res.json();
+  const code = Number(body && body.code);
+  if (body && body.message && body.message !== "success" && code !== 1) {
+    throw new Error(body.message || "读取步数失败");
+  }
+  return {
+    date,
+    steps: stepsFromBandData(body, date),
+    source: "huami",
+    user: maskUser(account),
+  };
 }
 
 export async function guestSync({ user, password, minStep, maxStep, step, now, fetchImpl }) {

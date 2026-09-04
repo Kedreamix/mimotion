@@ -2,6 +2,7 @@
   const DEFAULT = { owner: "Kedreamix", repo: "mimotion" };
   const DEFAULT_STEP_GOAL = 25000;
   let stepGoal = DEFAULT_STEP_GOAL;
+  let lastHuami = null;
   const schedule = window.MimoSchedule;
 
   const $ = (id) => document.getElementById(id);
@@ -66,6 +67,57 @@
     $("bar-value").style.width = `${Math.round(ratio * 100)}%`;
   }
 
+  function guestEndpoint(path) {
+    const endpoint = window.MIMO_GUEST_API;
+    if (!endpoint) return "";
+    return `${endpoint.replace(/\/$/, "")}${path}`;
+  }
+
+  function applyHuamiSteps(today) {
+    if (today && Number.isFinite(Number(today.steps))) {
+      lastHuami = today;
+      $("last-step").textContent = Number(today.steps).toLocaleString("zh-CN");
+      setBar(Number(today.steps));
+      const when = today.date === todayBJ() ? "华米当天" : (today.date || "华米");
+      $("step-date").textContent = `${when} · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+      return;
+    }
+    if (lastHuami) return;
+    $("last-step").textContent = "—";
+    setBar(0);
+    $("step-date").textContent = "暂无华米当天数据";
+  }
+
+  function applyCronLast(cron) {
+    const el = $("cron-last");
+    if (!el) return;
+    if (!cron || !cron.lastStep) {
+      el.textContent = "上次定时 — · 仓库记下的上传，不是实时";
+      return;
+    }
+    const dateLabel = cron.lastStepDate
+      ? (cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate)
+      : "";
+    el.textContent = dateLabel
+      ? `上次定时 ${cron.lastStep.toLocaleString("zh-CN")} · ${dateLabel} · 仓库记录，不是实时`
+      : `上次定时 ${cron.lastStep.toLocaleString("zh-CN")} · 仓库记录，不是实时`;
+  }
+
+  async function loadTodaySteps(fresh) {
+    const url = guestEndpoint(fresh ? "/today-steps?fresh=1" : "/today-steps");
+    if (!url) return null;
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.ok) return null;
+      const steps = Number(body.steps);
+      if (!Number.isFinite(steps)) return null;
+      return { date: body.date || "", steps, source: body.source || "huami" };
+    } catch {
+      return null;
+    }
+  }
+
   function minutesUntil(hour, minute) {
     const now = beijingParts();
     let delta = hour * 60 + minute - (now.h * 60 + now.min);
@@ -85,11 +137,7 @@
       ? (latest.event === "schedule" ? "定时" : "手动")
       : "还没有刷步记录";
 
-    $("last-step").textContent = cron.lastStep ? cron.lastStep.toLocaleString("zh-CN") : "—";
-    $("step-date").textContent = cron.lastStepDate
-      ? `${cron.lastStepDate === todayBJ() ? "今日" : cron.lastStepDate} · 目标 ${stepGoal.toLocaleString("zh-CN")}`
-      : "暂无步数记录";
-    setBar(cron.lastStep || 0);
+    applyCronLast(cron);
 
     $("last-sync").textContent = latest ? formatBJ(latest.updated_at || latest.created_at).slice(-5) : "—";
     $("last-sync-rel").textContent = latest ? relFromNow(latest.updated_at || latest.created_at) : "";
@@ -209,11 +257,15 @@
     };
   }
 
-  async function refresh() {
+  async function refresh(fresh = false) {
     $("refresh").disabled = true;
     try {
       const snapshot = await loadSnapshot();
       if (snapshot && snapshot.params) applyParams(snapshot.params);
+      const todayPromise = loadTodaySteps(fresh).then((today) => {
+        applyHuamiSteps(today);
+        return today;
+      });
       let data = snapshot;
       let usedSnapshot = false;
       try {
@@ -224,6 +276,7 @@
       }
       const cron = schedule.parseCronFile(data.cronText || "");
       renderStatus(cron, data.runs || []);
+      await todayPromise;
       if (usedSnapshot) {
         $("status-detail").textContent = "实时接口暂不可用，正在显示快照";
       }
@@ -236,7 +289,7 @@
     }
   }
 
-  $("refresh").addEventListener("click", refresh);
+  $("refresh").addEventListener("click", () => refresh(true));
   function tick() {
     const p = beijingParts();
     $("clock").textContent = `${pad(p.h)}:${pad(p.min)}`;
@@ -277,6 +330,9 @@
         return;
       }
       showOps(body.message || `已同步 ${body.step} 步`, true);
+      if (Number.isFinite(Number(body.step))) {
+        applyHuamiSteps({ date: todayBJ(), steps: Number(body.step), source: "huami" });
+      }
     } catch (err) {
       $("owner-pwd").value = "";
       const msg = String(err.message || err);
@@ -313,5 +369,5 @@
   }
 
   checkOwnerSetup();
-  refresh();
+  refresh(false);
 })();
