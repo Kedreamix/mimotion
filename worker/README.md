@@ -5,14 +5,14 @@
 ```bash
 npx wrangler deploy
 npx wrangler secret put OWNER_PASSWORD
-npx wrangler secret put PAT
+npx wrangler secret put CONFIG
 ```
 
 `OWNER_PASSWORD` 是看板上的站长密码，**不要**写进 GitHub Variables、`params.json` 或网页。
 
-`PAT` **不用新申请**：把仓库 Settings → Secrets → Actions 里已有的 `PAT` 复制到 Worker。Cloudflare 读不到 GitHub 密钥。密码验证通过后 Worker 用它触发 `workflow_dispatch`，Zepp 账号仍从仓库 `CONFIG` 读。
+`CONFIG` 可以和仓库 GitHub Secret 那份 JSON 相同。Worker 只用里面的 `USER` / `PWD`（以及可选的步数范围），**不会**发 PushPlus / 企业微信 / Telegram。GitHub `PAT` **不要**放到 Worker。定时任务继续读仓库 Secret。
 
-可选：`OWNER_REPO`（默认 `Kedreamix/mimotion`，如果你 fork 后改了仓库名才需要改）。
+`keep_vars = true`，之后部署不会冲掉密钥。
 
 Cloudflare 控制台路径：Workers & Pages → `mimotion` → Settings → Variables and Secrets。
 
@@ -23,5 +23,5 @@ Cloudflare 控制台路径：Workers & Pages → `mimotion` → Settings → Var
 本地：
 
 ```bash
-OWNER_PASSWORD=demo PAT=github_pat_xxx OWNER_REPO=yourname/mimotion node worker/dev-server.mjs
+OWNER_PASSWORD=demo CONFIG='{"USER":"a@b.com","PWD":"x"}' node worker/dev-server.mjs
 ```

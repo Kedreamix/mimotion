@@ -108,8 +108,8 @@
 
     const hours = cron.plannedHours;
     $("cron-caption").textContent = hours.length
-      ? `每天 ${hours.map((h) => `${h} 点`).join(" / ")} 附近。分钟每次成功后重随，不按同一分钟套全天。`
-      : "尚未读到 cron 计划";
+      ? `每天 ${hours.map((h) => `${h} 点`).join(" / ")} 附近走 Actions。分钟每次成功后重随；改整点、改步数到参数页。`
+      : "尚未读到 cron 计划。定时刷走 GitHub Actions，改整点到参数页。";
 
     renderTimeline(cron, stepRuns, slot);
     renderRuns(stepRuns.slice(0, 8));
@@ -304,8 +304,8 @@
       const body = await res.json().catch(() => ({}));
       if (!body.configured) {
         ready.textContent = "站长刷步还没配置完成。";
-      } else if (!body.hasPat) {
-        ready.textContent = "刷步接口还没配置完成。";
+      } else if (!body.hasAccount && !body.hasConfig) {
+        ready.textContent = "还差 Worker 里的 CONFIG。仓库那份 JSON 即可，不用贴 PAT。";
       }
     } catch {
       /* Worker 未部署时静默忽略，用户还是可以尝试输密码 */

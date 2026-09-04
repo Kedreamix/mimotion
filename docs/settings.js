@@ -261,7 +261,7 @@
     const json = JSON.stringify(collectConfig(schemaCache), null, 2);
     await navigator.clipboard.writeText(json);
     $("config-preview").textContent = json;
-    showStatus("已复制 CONFIG JSON。请更新仓库 Secret 名为 CONFIG 的值。", true);
+    showStatus("已复制 CONFIG JSON。请更新 GitHub Secret；马上刷也可以把同一份放到 Worker，不用 PAT。", true);
   });
 
   $("save-vars").addEventListener("click", async () => {

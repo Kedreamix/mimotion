@@ -58,8 +58,15 @@
       <article class="capability can">
         <span class="cap-icon" aria-hidden="true">◇</span>
         <div>
-          <strong>站长刷步只要密码</strong>
-          <p>看板输入站长密码即可。改仓库变量才需要 GitHub PAT</p>
+          <strong>马上刷不走 Actions</strong>
+          <p>看板输入站长密码，和迈步同一条华米接口</p>
+        </div>
+      </article>
+      <article class="capability can">
+        <span class="cap-icon" aria-hidden="true">◷</span>
+        <div>
+          <strong>定时刷才走 Actions</strong>
+          <p>整点、步数范围在这页改，保存后写进仓库变量</p>
         </div>
       </article>
     </section>
@@ -94,7 +101,7 @@
         <button id="save-vars" class="primary" type="button">保存设置</button>
         <a class="button-link" href="./#owner">去看板用密码刷步</a>
       </div>
-      <p class="action-note">保存设置才会改仓库 Variables。立刻刷步请回看板输入站长密码。</p>
+      <p class="action-note">这里保存的是定时任务参数。马上刷请回看板输入站长密码，不走 Actions。</p>
     </section>
 
     <details class="panel more-panel protected-panel">
@@ -104,7 +111,7 @@
       </summary>
       <div class="protected-note">
         <strong>不能在这里直接验证账号密码</strong>
-        <p>公开 Pages 不能直接提交 Zepp 密码去跑仓库工作流。请生成 CONFIG 后更新 GitHub Secrets。立刻刷步请回看板输入站长密码。</p>
+        <p>公开页不能提交 Zepp 密码。定时刷把完整 CONFIG 放到 GitHub Secret。马上刷可以把同一份贴到 Worker，不必放 PAT。Worker 这条链不会发 PushPlus。</p>
       </div>
       <form id="secret-form" class="form-grid secret-grid"></form>
       <pre id="config-preview" class="json"></pre>
@@ -125,7 +132,7 @@
         <button id="copy-vars" type="button">复制变量清单</button>
         <a id="vars-link" href="#" target="_blank" rel="noreferrer">Variables</a>
         <a id="update-workflow-link" href="#" target="_blank" rel="noreferrer">用 Actions 更新</a>
-        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 刷步</a>
+        <a id="run-workflow-link" href="#" target="_blank" rel="noreferrer">去 Actions 跑定时任务</a>
       </div>
     </details>
   </main>

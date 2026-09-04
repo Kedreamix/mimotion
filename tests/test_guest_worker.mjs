@@ -366,15 +366,16 @@ test("owner-status reports whether worker secrets are configured", async () => {
   }), ownerEnv()));
   assert.equal(pwdOnly.body.configured, true);
   assert.equal(pwdOnly.body.hasPassword, true);
-  assert.equal(pwdOnly.body.hasPat, false);
+  assert.equal(pwdOnly.body.hasAccount, false);
+  assert.equal(pwdOnly.body.hasConfig, false);
   assert.equal(JSON.stringify(pwdOnly.body).includes("secret"), false);
 
   const ready = await read(await handleRequest(new Request("https://guest.test/owner-status", {
     headers: { Origin: "https://kedreamix.github.io" },
-  }), ownerEnv({ PAT: "github_pat_test" })));
+  }), ownerEnv({ USER: "a@b.com", PWD: "zepp-secret" })));
   assert.equal(ready.body.configured, true);
-  assert.equal(ready.body.hasPat, true);
-  assert.equal(JSON.stringify(ready.body).includes("github_pat_test"), false);
+  assert.equal(ready.body.hasAccount, true);
+  assert.equal(JSON.stringify(ready.body).includes("zepp-secret"), false);
 });
 
 test("owner-run returns 503 when owner password secret is missing", async () => {
@@ -389,72 +390,94 @@ test("owner-run returns 503 when owner password secret is missing", async () => 
 test("owner-run returns 401 for wrong password", async () => {
   const res = await handleRequest(
     ownerRequest({ password: "wrong" }, "ip-wrong"),
-    ownerEnv({ PAT: "github_pat_test" }),
+    ownerEnv({ CONFIG: JSON.stringify({ USER: "a@b.com", PWD: "zepp" }) }),
   );
   const payload = await read(res);
   assert.equal(payload.status, 401);
   assert.match(payload.body.error, /密码/);
 });
 
-test("owner-run returns 503 when PAT is missing after password check", async () => {
-  const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-pat"), ownerEnv());
+test("owner-run returns 503 when USER/PWD are missing after password check", async () => {
+  const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-config"), ownerEnv());
   const payload = await read(res);
   assert.equal(payload.status, 503);
-  assert.match(payload.body.error, /配置完成/);
+  assert.match(payload.body.error, /CONFIG|USER|PWD|账号/);
 });
 
-test("owner-run triggers workflow_dispatch via GitHub API", async () => {
-  let dispatched = null;
-  const fetchImpl = async (url, options = {}) => {
-    dispatched = { url: String(url), options };
-    return new Response(null, { status: 204 });
-  };
+test("owner-run syncs via Huami using Worker USER/PWD, not GitHub Actions", async () => {
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
   const res = await handleRequest(
-    ownerRequest({ password: "secret", min_step: 12000, max_step: 15000 }, "ip-owner-ok"),
-    ownerEnv({ PAT: "github_pat_test", OWNER_REPO: "TestOwner/mimotion" }),
+    ownerRequest({ password: "secret", step: 12000 }, "ip-owner-ok"),
+    ownerEnv({ USER: "13800138000", PWD: "zepp-secret" }),
     fetchImpl,
   );
   const payload = await read(res);
   assert.equal(payload.status, 200);
   assert.equal(payload.body.ok, true);
-  assert.match(dispatched.url, /TestOwner\/mimotion\/actions\/workflows\/run\.yml\/dispatches/);
-  assert.match(dispatched.options.headers.Authorization, /github_pat_test/);
-  const sentBody = JSON.parse(dispatched.options.body);
-  assert.equal(sentBody.ref, "master");
-  assert.equal(sentBody.inputs.min_step, "12000");
-  assert.equal(sentBody.inputs.max_step, "15000");
-  assert.equal(JSON.stringify(payload.body).includes("github_pat_test"), false);
+  assert.equal(payload.body.step, 12000);
+  assert.match(payload.body.message, /同步 12000 步/);
+  assert.equal(JSON.stringify(payload.body).includes("zepp-secret"), false);
+  assert.equal(JSON.stringify(payload.body).includes("secret"), false);
 });
 
-test("owner-run accepts OWNER_GITHUB_PAT as an alias for PAT", async () => {
-  let dispatched = null;
-  const fetchImpl = async (url, options = {}) => {
-    dispatched = { url: String(url), options };
-    return new Response(null, { status: 204 });
-  };
+test("owner-run still accepts a slim CONFIG JSON as fallback", async () => {
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
   const res = await handleRequest(
-    ownerRequest({ password: "secret" }, "ip-owner-alias"),
-    ownerEnv({ OWNER_GITHUB_PAT: "github_pat_alias", OWNER_REPO: "TestOwner/mimotion" }),
+    ownerRequest({ password: "secret", step: 8000 }, "ip-owner-config"),
+    ownerEnv({ CONFIG: JSON.stringify({ USER: "a@b.com", PWD: "zepp-secret" }) }),
     fetchImpl,
   );
   const payload = await read(res);
   assert.equal(payload.status, 200);
-  assert.match(dispatched.options.headers.Authorization, /github_pat_alias/);
+  assert.equal(payload.body.step, 8000);
 });
 
-test("owner-run returns 400 when GitHub API rejects dispatch", async () => {
-  const fetchImpl = async () => new Response(
-    JSON.stringify({ message: "Resource not accessible by token" }),
-    { status: 422, headers: { "content-type": "application/json" } },
-  );
+test("owner-run returns 503 when CONFIG JSON is invalid", async () => {
   const res = await handleRequest(
-    ownerRequest({ password: "secret" }, "ip-owner-err"),
-    ownerEnv({ PAT: "github_pat_bad", OWNER_REPO: "TestOwner/mimotion" }),
-    fetchImpl,
+    ownerRequest({ password: "secret" }, "ip-bad-config"),
+    ownerEnv({ CONFIG: "USER=not-json" }),
   );
   const payload = await read(res);
-  assert.equal(payload.status, 400);
-  assert.match(payload.body.error, /Resource not accessible/);
+  assert.equal(payload.status, 503);
+  assert.match(payload.body.error, /JSON/);
 });
 
 const oauthEnv = {
