@@ -1,13 +1,16 @@
 (() => {
   const RING = 2 * Math.PI * 58;
   const $ = (id) => document.getElementById(id);
-  const PRESETS = [3000, 8000, 12000, 20000, 30000];
+  const PRESETS = [3000, 6666, 8000, 8888, 9999, 12000, 20000, 30000];
 
   function format(n) {
     return Number(n).toLocaleString("zh-CN");
   }
 
   function mood(n) {
+    if (n === 6666) return "六六大顺";
+    if (n === 8888) return "要发了";
+    if (n === 9999) return "长长久久";
     if (n < 3000) return "还在被窝";
     if (n < 8000) return "出门溜达";
     if (n < 12000) return "正常人类";
