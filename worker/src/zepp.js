@@ -61,6 +61,21 @@ function formBody(data) {
   return new URLSearchParams(data).toString();
 }
 
+async function timedFetch(fetchImpl, url, options, ms = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetchImpl(url, { ...options, signal: ctrl.signal });
+  } catch (err) {
+    if (err && (err.name === "AbortError" || String(err.message || "").includes("aborted"))) {
+      throw new Error("华米接口超时，请再试一次");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function applyBandTemplate(step, date) {
   const dated = BAND_TEMPLATE.replace(/date%22%3A%22(.*?)%22%2C%22data/, `date%22%3A%22${date}%22%2C%22data`);
   return dated.replace(/ttl%5C%22%3A(.*?)%2C%5C%22dis/, `ttl%5C%22%3A${step}%2C%5C%22dis`);
@@ -77,7 +92,7 @@ async function loginAccessToken(user, password, fetchImpl) {
     redirect_uri: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html",
   });
   const cipher = await encryptHuami(query);
-  const res = await fetchImpl("https://api-user.zepp.com/v2/registrations/tokens", {
+  const res = await timedFetch(fetchImpl, "https://api-user.zepp.com/v2/registrations/tokens", {
     method: "POST",
     redirect: "manual",
     headers: {
@@ -129,7 +144,7 @@ async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
       source: "com.xiaomi.hm.health:6.14.0:50818",
       third_name: "email",
     };
-  const res = await fetchImpl("https://account.huami.com/v2/client/login", {
+  const res = await timedFetch(fetchImpl, "https://account.huami.com/v2/client/login", {
     method: "POST",
     headers: {
       app_name: "com.xiaomi.hm.health",
@@ -157,7 +172,7 @@ async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
 async function postBandData(step, appToken, userId, fetchImpl, now) {
   const t = beijingTs(now);
   const dataJson = applyBandTemplate(String(step), todayBeijing(now));
-  const res = await fetchImpl(`https://api-mifit-cn.huami.com/v1/data/band_data.json?&t=${t}&r=${uuid()}`, {
+  const res = await timedFetch(fetchImpl, `https://api-mifit-cn.huami.com/v1/data/band_data.json?&t=${t}&r=${uuid()}`, {
     method: "POST",
     headers: {
       apptoken: appToken,

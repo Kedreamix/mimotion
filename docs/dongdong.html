@@ -75,7 +75,31 @@
         </label>
         <button id="submit" class="go" type="submit">走这一趟 <span>→</span></button>
       </form>
-      <p id="status" class="status" hidden></p>
+      <div id="result" class="result" hidden aria-live="assertive">
+        <strong id="result-title"></strong>
+        <p id="result-detail"></p>
+      </div>
+      <div id="receipt" class="receipt" hidden aria-live="assertive">
+        <p class="kicker">这一趟到了</p>
+        <p class="receipt-step"><strong id="receipt-step">0</strong><span>步</span></p>
+        <dl>
+          <div>
+            <dt>账号</dt>
+            <dd id="receipt-user">—</dd>
+          </div>
+          <div>
+            <dt>时间</dt>
+            <dd id="receipt-time">—</dd>
+          </div>
+        </dl>
+        <ol>
+          <li>打开 <strong>Zepp Life</strong>，下拉刷新</li>
+          <li>看今天是不是这个步数</li>
+          <li>支付宝 / 微信可能再过几分钟才跟上</li>
+        </ol>
+        <p class="receipt-note">看板顶部的「今日步数」是定时账号，不会因为这一趟变。</p>
+        <button id="again" type="button">再走一趟</button>
+      </div>
       <p class="hint">密码不会保存在页面。请只动自己的号。Zepp Life 账号，不是小米快捷登录。</p>
     </section>
   </main>
