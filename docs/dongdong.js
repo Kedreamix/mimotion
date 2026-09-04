@@ -1,23 +1,7 @@
 (() => {
-  const KEY = "mimo-dongdong-theme";
   const RING = 2 * Math.PI * 58;
   const $ = (id) => document.getElementById(id);
   const PRESETS = [3000, 8000, 12000, 20000, 30000];
-
-  function applyTheme(mode) {
-    document.documentElement.dataset.theme = mode;
-    document.querySelector('meta[name="theme-color"]').setAttribute(
-      "content",
-      mode === "light" ? "#efe7db" : "#07090d",
-    );
-    $("theme-btn").textContent = mode === "light" ? "深色" : "浅色";
-  }
-  applyTheme(localStorage.getItem(KEY) === "light" ? "light" : "dark");
-  $("theme-btn").addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-    localStorage.setItem(KEY, next);
-    applyTheme(next);
-  });
 
   function format(n) {
     return Number(n).toLocaleString("zh-CN");
