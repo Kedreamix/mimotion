@@ -20,6 +20,18 @@ Cloudflare 控制台路径：Workers & Pages → `mimotion` → Settings → Var
 
 迈步提交日志：Workers & Pages → `mimotion` → Observability / Logs。仓库已打开 `[observability] enabled = true`。合入带 `console.log` 的版本后，可以搜 `guest-run`，看到脱敏账号、密码位数、断在哪一步。密码不会进日志。实时跟也可以 `npx wrangler tail`。
 
+用量收集：
+
+- **D1**（表 `guest_runs`）记明文账号、成败、步数。看板用站长密码点「查看用量」。
+- **Analytics Engine**（dataset `mimotion_usage`）记次数和成败，适合看趋势。
+
+控制台操作：
+
+1. **D1**：Workers & Pages → D1 SQL database → Create `mimotion` → 绑到 Worker `mimotion`，Variable name `DB`。把 database id 填进根目录 `wrangler.toml` 的 `[[d1_databases]]`。
+2. **Analytics Engine**：Worker `mimotion` → Settings → Bindings → Add → Analytics Engine，Variable name `USAGE`，dataset `mimotion_usage`。没有单独「新建库」页。
+
+没绑定时迈步照常工作，只是不记账。密码不会写入 D1。
+
 `ALLOWED_ORIGINS` 写成看板地址即可，例如 `https://kedreamix.github.io/mimotion`。
 
 本地：

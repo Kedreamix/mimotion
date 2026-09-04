@@ -925,3 +925,77 @@ html[data-theme="light"] .locked .cap-icon {
 html[data-theme="light"] .facts div:not(:first-child) {
   border-left-color: var(--line);
 }
+
+.owner-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: end;
+}
+#usage-now { white-space: nowrap; }
+.usage-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--fill);
+}
+.usage-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.usage-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+.usage-list .ok { color: var(--ok); }
+.usage-list .fail { color: var(--bad); }
+
+html[data-skin="pikachu"] {
+  --bg: #1a1408;
+  --card: rgba(42, 32, 12, 0.92);
+  --orange: #F7D948;
+  --ok: #F7D948;
+  --link: #FFE566;
+  --text: #fff6c8;
+  --muted: #c9b56a;
+  --line: rgba(247, 217, 72, 0.18);
+}
+html[data-skin="pikachu"][data-theme="light"] {
+  --bg: #fff4b8;
+  --card: rgba(255, 250, 214, 0.94);
+  --text: #3a2a10;
+  --muted: #7a6420;
+  --orange: #E2B400;
+  --ok: #8a6a00;
+}
+html[data-skin="pikachu"] .bg,
+html[data-skin="pikachu"] .glow {
+  background:
+    radial-gradient(680px 320px at 12% -10%, rgba(247, 217, 72, 0.35), transparent 58%),
+    radial-gradient(420px 240px at 92% 18%, rgba(227, 53, 13, 0.18), transparent 62%),
+    linear-gradient(180deg, #2a210c, var(--bg) 42%);
+}
+html[data-skin="pikachu"][data-theme="light"] .bg,
+html[data-skin="pikachu"][data-theme="light"] .glow {
+  background:
+    radial-gradient(680px 320px at 12% -10%, rgba(247, 217, 72, 0.55), transparent 58%),
+    linear-gradient(180deg, #fff7cc, var(--bg) 42%);
+}
+html[data-skin="pikachu"] .logo {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231a1408'/%3E%3Cpath d='M18 22 L12 6 L20 18 Z' fill='%23F7D948'/%3E%3Cpath d='M46 22 L52 6 L44 18 Z' fill='%23F7D948'/%3E%3Cpath d='M12 6 L14 2 L16 8 Z' fill='%231c140a'/%3E%3Cpath d='M52 6 L50 2 L48 8 Z' fill='%231c140a'/%3E%3Ccircle cx='32' cy='36' r='16' fill='%23F7D948'/%3E%3Ccircle cx='22' cy='40' r='4.2' fill='%23E3350D'/%3E%3Ccircle cx='42' cy='40' r='4.2' fill='%23E3350D'/%3E%3Ccircle cx='27' cy='34' r='2.1' fill='%231c140a'/%3E%3Ccircle cx='37' cy='34' r='2.1' fill='%231c140a'/%3E%3C/svg%3E") center / cover no-repeat;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #E3350D, 0 8px 24px rgba(247, 217, 72, 0.35);
+}
+html[data-skin="pikachu"] button.primary {
+  background: #F7D948;
+  color: #1a1408;
+}
+html[data-skin="pikachu"] .bar i {
+  background: linear-gradient(90deg, #E3350D, #F7D948);
+}
