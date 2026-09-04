@@ -3,7 +3,7 @@ import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
-import { applyBandTemplate, clampStep, describeLoginError, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
+import { applyBandTemplate, clampStep, describeLoginError, formBody, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
 
 const PYTHON_PLAIN = "emailOrPhone=%2B8613800138000&password=secret&state=REDIRECTION&client_id=HuaMi&country_code=CN&token=access&redirect_uri=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fhm-registration%2Fsuccesssignin.html";
@@ -44,6 +44,22 @@ test("normalize phone and mask user", () => {
 test("describeLoginError turns Huami 401 into a password hint", () => {
   assert.match(describeLoginError("401"), /账号或密码不对/);
   assert.match(describeLoginError("oops"), /oops/);
+});
+
+test("formBody matches Python urllib.parse.urlencode", () => {
+  const query = formBody({
+    emailOrPhone: "a@b.com",
+    password: "a!b*c(d)e~f'g",
+    state: "REDIRECTION",
+    client_id: "HuaMi",
+    country_code: "CN",
+    token: "access",
+    redirect_uri: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html",
+  });
+  assert.equal(
+    query,
+    "emailOrPhone=a%40b.com&password=a%21b%2Ac%28d%29e~f%27g&state=REDIRECTION&client_id=HuaMi&country_code=CN&token=access&redirect_uri=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fhm-registration%2Fsuccesssignin.html",
+  );
 });
 
 test("clampStep stays within 1 and 98800", () => {
@@ -210,6 +226,9 @@ test("guest handler maps Huami login 401 to a password error", async () => {
   assert.equal(payload.body.ok, false);
   assert.equal(payload.body.stage, "login");
   assert.match(payload.body.error, /账号或密码不对/);
+  assert.equal(payload.body.received.user, maskUser("a@b.com"));
+  assert.equal(payload.body.received.password_len, 5);
+  assert.equal(JSON.stringify(payload.body).includes("wrong"), false);
 });
 
 test("guest handler returns huami-wait when Huami never answers", async () => {

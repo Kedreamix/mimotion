@@ -73,8 +73,16 @@ function uuid() {
   return crypto.randomUUID();
 }
 
-function formBody(data) {
-  return new URLSearchParams(data).toString();
+export function quotePlus(value) {
+  return encodeURIComponent(String(value))
+    .replace(/%20/g, "+")
+    .replace(/[!'()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
+}
+
+export function formBody(data) {
+  return Object.entries(data)
+    .map(([key, value]) => `${quotePlus(key)}=${quotePlus(value ?? "")}`)
+    .join("&");
 }
 
 async function timedFetch(fetchImpl, url, options, ms = 12000) {
@@ -253,6 +261,7 @@ export async function guestSync({ user, password, minStep, maxStep, step, now, f
     err.stage = stage;
     err.trace = trace;
     err.elapsed_ms = Date.now() - started;
+    err.received = { user: maskUser(account), password_len: pwd.length };
     throw err;
   }
 }

@@ -236,6 +236,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
       stage: err.stage || "worker",
       elapsed_ms: err.elapsed_ms,
       trace: err.trace || [],
+      received: err.received || undefined,
     }, 400, origin, env);
   }
 }

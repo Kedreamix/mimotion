@@ -65,10 +65,10 @@
       <form id="form">
         <p class="pass-lead">填自己的 Zepp Life 账号。走完这一趟就结束，不进仓库，不定闹钟。</p>
         <label>Zepp Life 账号
-          <input id="user" type="text" autocomplete="username" placeholder="手机号或邮箱" required />
+          <input id="user" name="zepp_user" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="手机号或邮箱" required />
         </label>
         <label>密码
-          <input id="password" type="password" autocomplete="off" placeholder="Zepp Life 密码，不是小米账号" required />
+          <input id="password" name="zepp_password" type="password" autocomplete="off" placeholder="请手打 Zepp Life 密码" required />
         </label>
         <label>精确步数
           <input id="step" type="number" min="1" max="98800" step="1" value="20000" required />
@@ -115,6 +115,6 @@
   </details>
 
   <script src="./guest-config.js"></script>
-  <script src="./dongdong.js?v=15"></script>
+  <script src="./dongdong.js?v=16"></script>
 </body>
 </html>

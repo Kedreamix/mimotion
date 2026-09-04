@@ -99,14 +99,17 @@
     }
     const names = { login: "登录华米 api-user.zepp.com", grant: "换票 account.huami.com", upload: "上传 api-mifit-cn.huami.com", worker: "Worker 内部", "huami-wait": "Worker 等华米总超时" };
     const errorText = String((err && err.message) || (body && body.error) || "");
+    const received = body && body.received
+      ? `已提交账号 ${body.received.user}，密码 ${body.received.password_len} 位。`
+      : "";
     if ((body && body.stage === "login" && /401|403|unauthorized/i.test(errorText))
       || /accessToken 失败\s*401/.test(errorText)) {
-      return "华米拒绝登录：账号或密码不对。请用 Zepp Life 自己的邮箱/手机和密码，不要用小米账号快捷登录。";
+      return `华米拒绝登录：账号或密码不对。${received}请手打 Zepp Life 自己的密码，不要用浏览器自动填充（这个站在 github.io 上，容易填成 GitHub 密码）。`.replace(/\s+/g, " ").trim();
     }
     if (body && body.stage) {
       const where = names[body.stage] || body.stage;
       const extra = formatTrace(body.trace, body.elapsed_ms);
-      return `断在：${where}。${errorText} ${extra}`.trim();
+      return `断在：${where}。${errorText} ${received} ${extra}`.replace(/\s+/g, " ").trim();
     }
     return errorText || "未知错误";
   }
@@ -196,7 +199,7 @@
     const button = $("submit");
     button.disabled = true;
     button.textContent = "在路上…";
-    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp。请留在这一页，变成「这一趟到了」才算成功。不要连点。`);
+    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp。已提交 ${user}，密码 ${password.length} 位。请留在这一页，变成「这一趟到了」才算成功。不要连点。`);
 
     try {
       const { res, body } = await postGuest(endpoint, payload);
