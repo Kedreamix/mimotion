@@ -240,7 +240,7 @@
 - **游客一次性刷步**：打开 [迈步](https://kedreamix.github.io/mimotion/dongdong.html)，填写自己的 Zepp Life 账号、密码和步数，点一次即可。不走定时任务，也不动仓库账号。
 - **站长刷步只要密码**：打开 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)，输入站长密码立刻刷自己的号，不用 GitHub。
 - **改仓库变量才要 PAT**：参数页写入 Variables、应用定时仍走 GitHub。
-- **仓库 Secret**：站长自己的账号、密码和推送 Token 仍只放 CONFIG，不从公开页直接提交。
+- **仓库 Secret**：定时任务读 GitHub `CONFIG`；马上刷步读 Worker 里那份相同的 `CONFIG`。两处都不要写进公开页。
 
 看板默认是**只读模式**。访客可以看公开状态，也可以用自己的 Zepp Life 账号走游客刷步。你自己立刻刷步：在看板输入**站长密码**（存在 Cloudflare Worker Secret，不写进网页）。
 
@@ -249,20 +249,20 @@
 游客表单和站长密码都提交到独立 Worker，**不会触发**仓库 `run.yml`，也**不会读取** GitHub `CONFIG`。
 
 - 看板地址始终是 `https://kedreamix.github.io/mimotion/`。Worker 只是刷步接口。
-- 站长刷步走 `POST /owner-run`，只带密码。Worker 验密码通过后触发 `workflow_dispatch`，Zepp 账号仍从仓库 `CONFIG` 读取。Worker Secret 需要 `OWNER_PASSWORD`，以及把仓库里**已有的** `PAT` 复制过去（不用新申请；Worker 读不到 GitHub Secrets）。
+- 站长刷步走 `POST /owner-run`，只带看板密码。Worker 验密码后用 **Worker Secret `CONFIG`** 里的 Zepp 账号，走和迈步相同的华米接口，几秒出结果。GitHub Secret 读不出来，所以要把仓库那份 CONFIG JSON 再 `wrangler secret put CONFIG` 一次。
 - 游客密码只在这一次 HTTPS 请求里使用，Worker 不落盘、不写 GitHub。
-- 按 IP 限流（10 分钟 5 次）。
-- 本地验证：`OWNER_PASSWORD=demo PAT=xxx node worker/dev-server.mjs`
+- 按 IP 限流（10 分钟 8 次）。
+- 本地验证：`OWNER_PASSWORD=demo CONFIG='{"USER":"a@b.com","PWD":"x"}' node worker/dev-server.mjs`
 - **不要**把 `OWNER_PASSWORD` 写成 GitHub Variables / `params.json`。公开仓库里谁都能看到。
 - 上线：
 
 ```bash
 npx wrangler deploy
 npx wrangler secret put OWNER_PASSWORD
-npx wrangler secret put PAT
+npx wrangler secret put CONFIG
 ```
 
-`PAT` 用仓库 Settings → Secrets 里已经有的那个，复制到 Worker，不用新申请。
+`PAT` 只给参数页改 Variables、应用定时用，马上刷步不需要。仓库 Actions 里的 `PAT` 继续给定时任务用。
 
 若 wrangler 打印的不是 `https://mimotion.kedreamix.workers.dev`，把 `docs/guest-config.js` 里的生产地址改成你的 `*.workers.dev`。
 - 允许的来源按看板地址匹配：`https://kedreamix.github.io/mimotion/`（浏览器 Origin 不含路径，Worker 会按站点 origin 放行）。

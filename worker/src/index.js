@@ -1,32 +1,9 @@
+import { parseOwnerConfig } from "./config.js";
 import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
-import { guestSync, maskUser, normalizeUser } from "./zepp.js";
+import { guestSync, maskUser, normalizeUser, stepRangeByTime } from "./zepp.js";
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
-
-async function triggerWorkflowDispatch({ repo, pat, workflowId = "run.yml", inputs = {}, fetchImpl = fetch }) {
-  const [owner, repoName] = repo.split("/");
-  const res = await fetchImpl(
-    `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflowId}/dispatches`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${pat}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({ ref: "master", inputs }),
-    },
-  );
-  if (res.status === 204) return { ok: true };
-  let msg = `GitHub API ${res.status}`;
-  try {
-    const body = await res.json();
-    if (body.message) msg = body.message;
-  } catch { /* ignore */ }
-  throw new Error(msg);
-}
 
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
@@ -123,14 +100,10 @@ function withDeadline(promise, ms) {
   return Promise.race([guarded, timeout]).finally(() => clearTimeout(timer));
 }
 
-function ownerPat(env) {
-  return env.PAT || env.OWNER_GITHUB_PAT || "";
-}
-
 function ownerSecretStatus(env) {
   const hasPassword = Boolean(env.OWNER_PASSWORD);
-  const hasPat = Boolean(ownerPat(env));
-  return { hasPassword, hasPat, configured: hasPassword };
+  const hasConfig = Boolean(String(env.CONFIG || "").trim());
+  return { hasPassword, hasConfig, configured: hasPassword };
 }
 
 export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = null) {
@@ -210,28 +183,54 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
       if (!safeEqual(body.password, env.OWNER_PASSWORD)) {
         return json({ ok: false, error: "站长密码不对" }, 401, origin, env);
       }
-      const pat = ownerPat(env);
-      if (!pat) {
+      let cfg;
+      try {
+        cfg = parseOwnerConfig(env.CONFIG);
+      } catch (err) {
+        return json({ ok: false, error: String(err.message || err) }, 503, origin, env);
+      }
+      if (!cfg) {
         return json({
           ok: false,
-          error: "刷步接口还没配置完成。",
+          error: "马上刷步还差 Worker 里的 CONFIG。GitHub Secret 读不出来，把仓库那份 JSON 原样执行 wrangler secret put CONFIG。",
         }, 503, origin, env);
       }
-      const repo = env.OWNER_REPO || "Kedreamix/mimotion";
-      await triggerWorkflowDispatch({
-        repo,
-        pat,
-        workflowId: "run.yml",
-        inputs: {
-          ...(body.min_step ? { min_step: String(body.min_step) } : {}),
-          ...(body.max_step ? { max_step: String(body.max_step) } : {}),
-        },
-        fetchImpl,
-      });
-      return json({
-        ok: true,
-        message: "已触发 GitHub Actions 刷步，账号从仓库 CONFIG 读取，稍后可在 Actions 页面查看进度",
-      }, 200, origin, env);
+      const now = new Date();
+      const wantExact = body.step != null && body.step !== "";
+      const rawMin = body.min_step ?? cfg.minStep;
+      const rawMax = body.max_step ?? cfg.maxStep;
+      let minStep = rawMin;
+      let maxStep = rawMax;
+      if (!wantExact && (rawMin || rawMax)) {
+        const scaled = stepRangeByTime(now, Number(rawMin) || 18000, Number(rawMax) || 25000);
+        minStep = scaled.min;
+        maxStep = scaled.max;
+      }
+      const rawDeadline = Number(env.GUEST_DEADLINE_MS);
+      const deadlineMs = Number.isFinite(rawDeadline) && rawDeadline > 0 ? rawDeadline : 20000;
+      const results = [];
+      for (const account of cfg.accounts) {
+        results.push(await withDeadline(guestSync({
+          user: account.user,
+          password: account.password,
+          minStep,
+          maxStep,
+          step: body.step,
+          now,
+          fetchImpl,
+        }), deadlineMs));
+      }
+      const last = results[results.length - 1];
+      result = {
+        step: last.step,
+        user: last.user,
+        count: results.length,
+        elapsed_ms: last.elapsed_ms,
+        trace: last.trace,
+        message: results.length === 1
+          ? `已为 ${last.user} 同步 ${last.step} 步`
+          : `已为 ${results.length} 个账号同步，最近 ${last.step} 步`,
+      };
     } else {
       const receivedUser = maskUser(normalizeUser(body.user));
       const passwordLen = String(body.password || "").trim().length;
@@ -272,7 +271,8 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
       ok: true,
       step: result.step,
       user: result.user,
-      message: `已为 ${result.user} 同步 ${result.step} 步`,
+      count: result.count || 1,
+      message: result.message || `已为 ${result.user} 同步 ${result.step} 步`,
       elapsed_ms: result.elapsed_ms,
       trace: result.trace || [],
     }, 200, origin, env);

@@ -59,7 +59,7 @@
         <span class="cap-icon" aria-hidden="true">◇</span>
         <div>
           <strong>站长刷步只要密码</strong>
-          <p>看板输入站长密码即可。改仓库变量才需要 GitHub PAT</p>
+          <p>看板输入站长密码即可，和迈步走同一条华米接口。改仓库变量才需要 GitHub PAT</p>
         </div>
       </article>
     </section>
@@ -104,7 +104,7 @@
       </summary>
       <div class="protected-note">
         <strong>不能在这里直接验证账号密码</strong>
-        <p>公开 Pages 不能直接提交 Zepp 密码去跑仓库工作流。请生成 CONFIG 后更新 GitHub Secrets。立刻刷步请回看板输入站长密码。</p>
+        <p>公开页不能提交 Zepp 密码。生成 CONFIG 后：定时刷更新 GitHub Secret；马上刷还要把同一份贴到 Cloudflare Worker 的 CONFIG。</p>
       </div>
       <form id="secret-form" class="form-grid secret-grid"></form>
       <pre id="config-preview" class="json"></pre>
