@@ -108,8 +108,8 @@
 
     const hours = cron.plannedHours;
     $("cron-caption").textContent = hours.length
-      ? `每天 ${hours.map((h) => `${h} 点`).join(" / ")} 附近。分钟每次成功后重随，不按同一分钟套全天。`
-      : "尚未读到 cron 计划";
+      ? `每天 ${hours.map((h) => `${h} 点`).join(" / ")} 附近走 Actions。分钟每次成功后重随；改整点、改步数到参数页。`
+      : "尚未读到 cron 计划。定时刷走 GitHub Actions，改整点到参数页。";
 
     renderTimeline(cron, stepRuns, slot);
     renderRuns(stepRuns.slice(0, 8));
