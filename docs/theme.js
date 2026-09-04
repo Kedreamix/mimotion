@@ -5,7 +5,7 @@
   const ORDER = ["system", "light", "dark"];
   const mq = window.matchMedia("(prefers-color-scheme: light)");
   const DEFAULT_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E";
-  const PIKA_ICON = "./assets/spark-favicon.png";
+  const PIKA_ICON = "./assets/pikachu-mark.svg";
 
   function pref() {
     const saved = localStorage.getItem(KEY) || localStorage.getItem(OLD);

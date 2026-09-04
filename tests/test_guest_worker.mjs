@@ -3,7 +3,7 @@ import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest, TODAY_STEPS_CACHE_URL } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
-import { hasAnalytics, hasD1, sanitizeError, usageRow } from "../worker/src/usage.js";
+import { ensureSchema, hasAnalytics, hasD1, sanitizeError, usageRow } from "../worker/src/usage.js";
 import { resetStatsForTests } from "../worker/src/stats.js";
 import { applyBandTemplate, clampStep, describeLoginError, formBody, maskUser, normalizeUser, parseSummarySteps, regionHostFromLogin, stepRangeByTime, stepsFromBandData, todayBeijing } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
@@ -817,33 +817,44 @@ function memoryD1() {
       return { count: 2 };
     },
     prepare(sql) {
+      const execRun = async (...args) => {
+        if (/INSERT\s+INTO\s+guest_runs/i.test(sql)) {
+          const [created_at, user, ok, step, stage, error, elapsed_ms, kind] = args;
+          rows.push({
+            id: nextId++,
+            created_at,
+            user,
+            ok,
+            step,
+            stage,
+            error,
+            elapsed_ms,
+            kind,
+          });
+        }
+        return { success: true };
+      };
+      const bound = (...args) => ({
+        async run() {
+          return execRun(...args);
+        },
+        async all() {
+          return { results: query(sql, args) };
+        },
+        async first() {
+          return query(sql, args)[0] || null;
+        },
+      });
       return {
-        bind(...args) {
-          return {
-            async run() {
-              if (/INSERT\s+INTO\s+guest_runs/i.test(sql)) {
-                const [created_at, user, ok, step, stage, error, elapsed_ms, kind] = args;
-                rows.push({
-                  id: nextId++,
-                  created_at,
-                  user,
-                  ok,
-                  step,
-                  stage,
-                  error,
-                  elapsed_ms,
-                  kind,
-                });
-              }
-              return { success: true };
-            },
-            async all() {
-              return { results: query(sql, args) };
-            },
-            async first() {
-              return query(sql, args)[0] || null;
-            },
-          };
+        bind: bound,
+        async run() {
+          return execRun();
+        },
+        async all() {
+          return { results: query(sql, []) };
+        },
+        async first() {
+          return query(sql, [])[0] || null;
         },
       };
     },
@@ -922,6 +933,35 @@ function guestRunRequest(body, ip = "guest-usage") {
     body: JSON.stringify(body),
   });
 }
+
+test("ensureSchema prepares one-line CREATE TABLE and never calls exec", async () => {
+  const calls = [];
+  const db = {
+    async exec(sql) {
+      calls.push(["exec", sql]);
+      throw new Error("D1 exec should not be used");
+    },
+    prepare(sql) {
+      calls.push(["prepare", sql]);
+      return {
+        async run() {
+          return { success: true };
+        },
+        bind() {
+          return {
+            async run() {
+              return { success: true };
+            },
+          };
+        },
+      };
+    },
+  };
+  await ensureSchema(db);
+  assert.equal(calls.some((item) => item[0] === "exec"), false);
+  assert.ok(calls.some((item) => item[0] === "prepare" && item[1].startsWith("CREATE TABLE IF NOT EXISTS guest_runs (id INTEGER")));
+  assert.equal(calls.every((item) => !String(item[1]).includes("\n")), true);
+});
 
 test("hasD1 / hasAnalytics detect bindings without throwing", () => {
   assert.equal(hasD1({}), false);

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="5Ä ">
+  <defs>
+    <linearGradient id="fur" x1="18" y1="16" x2="46" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE566"/>
+      <stop offset=".45" stop-color="#FFCB05"/>
+      <stop offset="1" stop-color="#E8A800"/>
+    </linearGradient>
+    <linearGradient id="ear" x1="16" y1="6" x2="24" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE566"/>
+      <stop offset="1" stop-color="#F4C400"/>
+    </linearGradient>
+    <radialGradient id="badge" cx="32" cy="30" r="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3a2a12"/>
+      <stop offset="1" stop-color="#161008"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="31" fill="url(#badge)"/>
+  <circle cx="32" cy="32" r="29.2" fill="none" stroke="#F7D948" stroke-width="1.4"/>
+  <!-- lightning -->
+  <path d="M48 18 L54 28 L50 28 L56 42 L46 31 L50 31 Z" fill="#FFDE3A" stroke="#5a3a10" stroke-width=".8" stroke-linejoin="round"/>
+  <!-- left ear -->
+  <path d="M24.5 27 C20 18 16.5 8.5 14.2 4.2 C18.8 6.2 25.2 16 27.8 24.8 Z" fill="url(#ear)" stroke="#3a2710" stroke-width="1.15" stroke-linejoin="round"/>
+  <path d="M16.1 5.1 C15.2 3.4 14.4 2.4 14.2 4.2 C15.6 7.6 17.8 12.6 20.2 17.2 C19.1 12.4 17.5 8 16.1 5.1 Z" fill="#1c140a"/>
+  <!-- right ear -->
+  <path d="M39.5 27 C44 18 47.5 8.5 49.8 4.2 C45.2 6.2 38.8 16 36.2 24.8 Z" fill="url(#ear)" stroke="#3a2710" stroke-width="1.15" stroke-linejoin="round"/>
+  <path d="M47.9 5.1 C48.8 3.4 49.6 2.4 49.8 4.2 C48.4 7.6 46.2 12.6 43.8 17.2 C44.9 12.4 46.5 8 47.9 5.1 Z" fill="#1c140a"/>
+  <!-- head -->
+  <ellipse cx="32" cy="37.2" rx="16.6" ry="15.4" fill="url(#fur)" stroke="#3a2710" stroke-width="1.2"/>
+  <!-- cheeks -->
+  <circle cx="21.4" cy="41.2" r="4.1" fill="#E3350D"/>
+  <circle cx="42.6" cy="41.2" r="4.1" fill="#E3350D"/>
+  <circle cx="20.4" cy="40.2" r="1.1" fill="#ff7a55" opacity=".7"/>
+  <circle cx="41.6" cy="40.2" r="1.1" fill="#ff7a55" opacity=".7"/>
+  <!-- eyes -->
+  <ellipse cx="26.6" cy="35.4" rx="2.35" ry="3.05" fill="#1c140a"/>
+  <ellipse cx="37.4" cy="35.4" rx="2.35" ry="3.05" fill="#1c140a"/>
+  <circle cx="27.3" cy="34.4" r=".85" fill="#fff"/>
+  <circle cx="38.1" cy="34.4" r=".85" fill="#fff"/>
+  <!-- nose + mouth -->
+  <ellipse cx="32" cy="40.4" rx="1.15" ry=".8" fill="#5a3a18"/>
+  <path d="M28.6 43.4 Q32 46.2 35.4 43.4" fill="none" stroke="#3a2710" stroke-width="1.15" stroke-linecap="round"/>
+</svg>

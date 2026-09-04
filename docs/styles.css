@@ -1001,7 +1001,7 @@ html[data-skin="pikachu"][data-theme="light"] .glow {
 html[data-skin="pikachu"] .logo {
   width: 42px;
   height: 42px;
-  background: url("./assets/spark-mascot.webp") center / cover no-repeat;
+  background: url("./assets/pikachu-mark.svg") center / cover no-repeat;
   border-radius: 50%;
   box-shadow:
     0 0 0 2px #ffd942,
