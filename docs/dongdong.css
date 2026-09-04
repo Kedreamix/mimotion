@@ -295,6 +295,12 @@ input:focus {
   background: rgba(255, 93, 115, 0.08);
 }
 .result.bad strong { color: var(--bad); }
+.result.maybe {
+  border-color: rgba(255, 196, 72, 0.4);
+  background: rgba(255, 196, 72, 0.1);
+}
+.result.maybe strong { color: #e6b23a; }
+html[data-theme="light"] .result.maybe strong { color: #9a6b00; }
 .hint { margin: 10px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .receipt { padding: 16px 18px 8px; }
 .receipt .kicker { margin: 0; }

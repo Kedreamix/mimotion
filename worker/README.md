@@ -16,6 +16,8 @@ npx wrangler secret put PAT
 
 Cloudflare 控制台路径：Workers & Pages → `mimotion` → Settings → Variables and Secrets。
 
+动动吧提交日志：Workers & Pages → `mimotion` → Observability / Logs。仓库已打开 `[observability] enabled = true`。合入带 `console.log` 的版本后，可以搜 `guest-run`，看到脱敏账号、密码位数、断在哪一步。密码不会进日志。实时跟也可以 `npx wrangler tail`。
+
 `ALLOWED_ORIGINS` 写成看板地址即可，例如 `https://kedreamix.github.io/mimotion`。
 
 本地：

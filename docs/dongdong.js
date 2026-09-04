@@ -1,7 +1,6 @@
 (() => {
   const KEY = "mimo-dongdong-theme";
   const RING = 2 * Math.PI * 58;
-  const REQUEST_MS = 45000;
   const $ = (id) => document.getElementById(id);
   const PRESETS = [3000, 8000, 12000, 20000, 30000];
 
@@ -95,19 +94,24 @@
   }
 
   function breakText(kind, body, err) {
-    if (kind === "abort") {
-      return "断在：手机等 Worker 回包。页面先断开了，所以看不到华米登录/上传进行到哪一步。去 Zepp Life 刷新确认有没有刷上。";
+    if (kind === "dropped") {
+      return "请求已经发出，但这一页没等到回执。后台仍可能已经刷上。请打开 Zepp Life 下拉刷新核对今天的步数，不要连点。";
     }
-    if (kind === "network") {
-      return "断在：手机连不上 mimotion.kedreamix.workers.dev（还没进华米）。";
+    const names = { login: "登录华米 api-user.zepp.com", grant: "换票 account.huami.com", upload: "上传 api-mifit-cn.huami.com", worker: "Worker 内部", "huami-wait": "Worker 等华米总超时" };
+    const errorText = String((err && err.message) || (body && body.error) || "");
+    const received = body && body.received
+      ? `已提交账号 ${body.received.user}，密码 ${body.received.password_len} 位。`
+      : "";
+    if ((body && body.stage === "login" && /401|403|unauthorized/i.test(errorText))
+      || /accessToken 失败\s*401/.test(errorText)) {
+      return `华米拒绝登录：账号或密码不对。${received}请手打 Zepp Life 自己的密码，不要用浏览器自动填充（这个站在 github.io 上，容易填成 GitHub 密码）。`.replace(/\s+/g, " ").trim();
     }
-    const names = { login: "登录华米 api-user.zepp.com", grant: "换票 account.huami.com", upload: "上传 api-mifit-cn.huami.com", worker: "Worker 内部" };
     if (body && body.stage) {
       const where = names[body.stage] || body.stage;
       const extra = formatTrace(body.trace, body.elapsed_ms);
-      return `断在：${where}。${body.error || ""} ${extra}`.trim();
+      return `断在：${where}。${errorText} ${received} ${extra}`.replace(/\s+/g, " ").trim();
     }
-    return String((err && err.message) || (body && body.error) || "未知错误");
+    return errorText || "未知错误";
   }
 
   function showReceipt({ step, user, trace, elapsed_ms }) {
@@ -158,38 +162,29 @@
   }
   ping();
 
-  function abortAfter(ms) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), ms);
-    return { signal: ctrl.signal, cancel: () => clearTimeout(timer) };
-  }
-
-  async function postGuest(endpoint, payload, signal) {
+  async function postGuest(endpoint, payload) {
     const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
-      signal,
-      keepalive: true,
     });
     const body = await res.json().catch(() => ({}));
     return { res, body };
   }
 
-  function isAbort(err) {
-    const msg = String(err && err.message || err);
-    return (err && err.name === "AbortError") || msg.includes("aborted");
-  }
-
-  function isNetwork(err) {
-    const msg = String(err && err.message || err);
-    return msg.includes("Failed to fetch") || msg.includes("Load failed");
+  function isDropped(err) {
+    const msg = String(err && err.message || err).toLowerCase();
+    return (err && err.name === "AbortError")
+      || msg.includes("aborted")
+      || msg.includes("failed to fetch")
+      || msg.includes("load failed")
+      || msg.includes("networkerror");
   }
 
   $("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const user = ($("user").value || "").trim();
-    const password = $("password").value || "";
+    const password = ($("password").value || "").trim();
     const value = setStep($("step").value);
     if (!user || !password) {
       showResult("bad", "还没出发", "先填自己的账号和密码。");
@@ -204,28 +199,10 @@
     const button = $("submit");
     button.disabled = true;
     button.textContent = "在路上…";
-    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp。手机上可能要十几秒，变成「这一趟到了」才算成功。`);
-
-    async function attempt() {
-      const wait = abortAfter(REQUEST_MS);
-      try {
-        return await postGuest(endpoint, payload, wait.signal);
-      } finally {
-        wait.cancel();
-      }
-    }
+    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp。已提交 ${user}，密码 ${password.length} 位。请留在这一页，变成「这一趟到了」才算成功。不要连点。`);
 
     try {
-      let out;
-      try {
-        out = await attempt();
-      } catch (err) {
-        if (!isAbort(err) && !isNetwork(err)) throw err;
-        showResult("wait", "还在路上，正在再试一次", "刚才这趟没等到回执，正在重发，请再等一会儿。");
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        out = await attempt();
-      }
-      const { res, body } = out;
+      const { res, body } = await postGuest(endpoint, payload);
       if (!res.ok || !body.ok) {
         console.info("[动动吧] 失败", body);
         showResult("bad", "没走成", breakText("worker", body));
@@ -237,10 +214,8 @@
       console.info("[动动吧] 成功", { step, trace: body.trace, elapsed_ms: body.elapsed_ms });
       showReceipt({ step, user: body.user, trace: body.trace, elapsed_ms: body.elapsed_ms });
     } catch (err) {
-      if (isAbort(err)) {
-        showResult("bad", "没走成", breakText("abort"));
-      } else if (isNetwork(err)) {
-        showResult("bad", "没走成", breakText("network"));
+      if (isDropped(err)) {
+        showResult("maybe", "页面没等到回执", breakText("dropped"));
       } else {
         showResult("bad", "没走成", breakText("other", {}, err));
       }
