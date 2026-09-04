@@ -296,6 +296,50 @@ input:focus {
 }
 .result.bad strong { color: var(--bad); }
 .hint { margin: 10px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.receipt { padding: 16px 18px 8px; }
+.receipt .kicker { margin: 0; }
+.receipt-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.receipt-step strong {
+  font-size: clamp(36px, 9vw, 52px);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok);
+}
+.receipt-step span { color: var(--muted); font-size: 16px; }
+.receipt dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.receipt dt { font-size: 11px; color: var(--muted); }
+.receipt dd { margin: 2px 0 0; font-size: 14px; }
+.receipt ol {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.receipt-note { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+#again {
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.pass.arrived .stub span:first-child { color: var(--ok); }
 
 .about {
   margin: 18px auto 36px;

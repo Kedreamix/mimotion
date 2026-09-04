@@ -69,14 +69,49 @@
   setStep(20000);
 
   function showResult(kind, title, detail) {
+    $("receipt").hidden = true;
+    $("form").hidden = false;
     const el = $("result");
     el.hidden = false;
     el.className = "result " + kind;
     $("result-title").textContent = title;
     $("result-detail").textContent = detail || "";
-    document.querySelector(".watch").classList.toggle("done", kind === "ok");
+    document.querySelector(".watch").classList.toggle("done", false);
+    document.querySelector(".pass").classList.remove("arrived");
     el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+
+  function beijingStamp() {
+    const bj = new Date(Date.now() + 8 * 3600 * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${bj.getUTCFullYear()}-${pad(bj.getUTCMonth() + 1)}-${pad(bj.getUTCDate())} ${pad(bj.getUTCHours())}:${pad(bj.getUTCMinutes())}`;
+  }
+
+  function showReceipt({ step, user }) {
+    $("form").hidden = true;
+    $("result").hidden = true;
+    $("receipt").hidden = false;
+    $("receipt-step").textContent = format(step);
+    $("receipt-user").textContent = user || "已提交";
+    $("receipt-time").textContent = `${beijingStamp()} · 北京时间`;
+    $("mood").textContent = "到了";
+    document.querySelector(".watch").classList.add("done");
+    document.querySelector(".pass").classList.add("arrived");
+    document.querySelector(".stub span:first-child").textContent = "已盖章";
+    $("receipt").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  $("again").addEventListener("click", () => {
+    $("receipt").hidden = true;
+    $("form").hidden = false;
+    $("result").hidden = true;
+    $("password").value = "";
+    $("password").focus();
+    $("mood").textContent = mood(Number($("step").value));
+    document.querySelector(".watch").classList.remove("done");
+    document.querySelector(".pass").classList.remove("arrived");
+    document.querySelector(".stub span:first-child").textContent = "今日通行条";
+  });
 
   async function ping() {
     const live = $("api-live");
@@ -122,7 +157,7 @@
     const button = $("submit");
     button.disabled = true;
     button.textContent = "在路上…";
-    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp，大约几秒。下面变成「刷成功了」才算数。`);
+    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp，大约几秒。变成「这一趟到了」的回执才算成功。`);
     const wait = abortAfter(REQUEST_MS);
     try {
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
@@ -144,11 +179,8 @@
         return;
       }
       const step = Number(body.step);
-      showResult(
-        "ok",
-        `刷成功了 · ${format(step)} 步`,
-        `账号 ${body.user || "已提交"} 今天已同步 ${format(step)} 步。打开 Zepp Life 下拉刷新就能看到。支付宝 / 微信可能要再等一会儿。`,
-      );
+      setStep(step);
+      showReceipt({ step, user: body.user });
     } catch (err) {
       $("password").value = "";
       const msg = String(err.message || err);
