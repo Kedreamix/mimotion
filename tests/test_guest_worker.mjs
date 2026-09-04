@@ -172,7 +172,7 @@ function huamiReadPlan(steps, date = todayBeijing()) {
       body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "app-token", user_id: "u1" } }),
     },
     {
-      expectUrl: /api-mifit-cn\.huami\.com\/v1\/data\/band_data\.json\?.*query_type=summary/,
+      expectUrl: /api-mifit-cn\.huami\.com\/v1\/data\/band_data\.json\?.*query_type=summary.*device_type=/,
       expectMethod: "GET",
       expectHeader: { apptoken: "app-token", appname: "com.xiaomi.hm.health" },
       status: 200,
@@ -657,6 +657,82 @@ test("GET /today-steps reads Huami summary, caches, and honors fresh=1", async (
   ));
   assert.equal(fresh.status, 200);
   assert.equal(fresh.body.steps, 999);
+});
+
+test("GET /today-steps stays on the CN upload host even if login maps another region", async () => {
+  const payload = await read(await handleRequest(
+    todayStepsRequest(),
+    ownerEnv({ USER: "a@b.com", PWD: "zepp" }),
+    mockFetch([
+      {
+        expectUrl: /api-user\.zepp\.com/,
+        expectMethod: "POST",
+        status: 303,
+        headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+      },
+      {
+        expectUrl: /account\.huami\.com/,
+        expectMethod: "POST",
+        status: 200,
+        body: JSON.stringify({
+          result: "ok",
+          token_info: { login_token: "l", app_token: "app-token", user_id: "u1" },
+          domains: { "api-mifit.huami.com": "api-mifit-de.huami.com" },
+        }),
+      },
+      {
+        expectUrl: /api-mifit-cn\.huami\.com\/v1\/data\/band_data\.json\?.*device_type=android_phone/,
+        expectMethod: "GET",
+        status: 200,
+        body: JSON.stringify({
+          code: 1,
+          message: "success",
+          data: [{ date: todayBeijing(), summary: JSON.stringify({ stp: { ttl: 321 } }) }],
+        }),
+      },
+    ]),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.steps, 321);
+});
+
+test("GET /today-steps retries summary with device_type=0 if android_phone returns 400", async () => {
+  const payload = await read(await handleRequest(
+    todayStepsRequest(),
+    ownerEnv({ USER: "a@b.com", PWD: "zepp" }),
+    mockFetch([
+      {
+        expectUrl: /api-user\.zepp\.com/,
+        expectMethod: "POST",
+        status: 303,
+        headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+      },
+      {
+        expectUrl: /account\.huami\.com/,
+        expectMethod: "POST",
+        status: 200,
+        body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "app-token", user_id: "u1" } }),
+      },
+      {
+        expectUrl: /device_type=android_phone/,
+        expectMethod: "GET",
+        status: 400,
+        body: JSON.stringify({ code: 0, message: "invalid device" }),
+      },
+      {
+        expectUrl: /device_type=0/,
+        expectMethod: "GET",
+        status: 200,
+        body: JSON.stringify({
+          code: 1,
+          message: "success",
+          data: [{ date: todayBeijing(), summary: JSON.stringify({ stp: { ttl: 777 } }) }],
+        }),
+      },
+    ]),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.steps, 777);
 });
 
 test("GET /today-steps CORS matches other public GET routes", async () => {
