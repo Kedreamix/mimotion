@@ -148,6 +148,10 @@ test("guest handler mocked login and sync does not persist password", async () =
   assert.equal(payload.body.step, 12000);
   assert.equal(payload.body.user.includes("guest-secret"), false);
   assert.equal(JSON.stringify(payload.body).includes("guest-secret"), false);
+  assert.equal(payload.body.trace.length, 3);
+  assert.equal(payload.body.trace[0].stage, "login");
+  assert.equal(payload.body.trace[1].stage, "grant");
+  assert.equal(payload.body.trace[2].stage, "upload");
 });
 
 test("guest handler accepts an exact step", async () => {

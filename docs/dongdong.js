@@ -87,13 +87,37 @@
     return `${bj.getUTCFullYear()}-${pad(bj.getUTCMonth() + 1)}-${pad(bj.getUTCDate())} ${pad(bj.getUTCHours())}:${pad(bj.getUTCMinutes())}`;
   }
 
-  function showReceipt({ step, user }) {
+  function formatTrace(trace, elapsed) {
+    const names = { login: "登录华米", grant: "换登录票", upload: "上传步数" };
+    const parts = (trace || []).map((item) => `${names[item.stage] || item.stage} ${item.ms}ms`);
+    if (Number.isFinite(elapsed)) parts.push(`合计 ${elapsed}ms`);
+    return parts.join(" · ");
+  }
+
+  function breakText(kind, body, err) {
+    if (kind === "abort") {
+      return "断在：手机等 Worker 回包。页面先断开了，所以看不到华米登录/上传进行到哪一步。去 Zepp Life 刷新确认有没有刷上。";
+    }
+    if (kind === "network") {
+      return "断在：手机连不上 mimotion.kedreamix.workers.dev（还没进华米）。";
+    }
+    const names = { login: "登录华米 api-user.zepp.com", grant: "换票 account.huami.com", upload: "上传 api-mifit-cn.huami.com", worker: "Worker 内部" };
+    if (body && body.stage) {
+      const where = names[body.stage] || body.stage;
+      const extra = formatTrace(body.trace, body.elapsed_ms);
+      return `断在：${where}。${body.error || ""} ${extra}`.trim();
+    }
+    return String((err && err.message) || (body && body.error) || "未知错误");
+  }
+
+  function showReceipt({ step, user, trace, elapsed_ms }) {
     $("form").hidden = true;
     $("result").hidden = true;
     $("receipt").hidden = false;
     $("receipt-step").textContent = format(step);
     $("receipt-user").textContent = user || "已提交";
     $("receipt-time").textContent = `${beijingStamp()} · 北京时间`;
+    $("receipt-trace").textContent = formatTrace(trace, elapsed_ms) || "";
     $("mood").textContent = "到了";
     document.querySelector(".watch").classList.add("done");
     document.querySelector(".pass").classList.add("arrived");
@@ -203,20 +227,22 @@
       }
       const { res, body } = out;
       if (!res.ok || !body.ok) {
-        showResult("bad", "没走成", body.error || `接口返回 ${res.status}`);
+        console.info("[动动吧] 失败", body);
+        showResult("bad", "没走成", breakText("worker", body));
         return;
       }
       $("password").value = "";
       const step = Number(body.step);
       setStep(step);
-      showReceipt({ step, user: body.user });
+      console.info("[动动吧] 成功", { step, trace: body.trace, elapsed_ms: body.elapsed_ms });
+      showReceipt({ step, user: body.user, trace: body.trace, elapsed_ms: body.elapsed_ms });
     } catch (err) {
       if (isAbort(err)) {
-        showResult("bad", "没走成", "等了较久还没收到回执。接口本身能刷成功，请再点一次，不要连点。");
+        showResult("bad", "没走成", breakText("abort"));
       } else if (isNetwork(err)) {
-        showResult("bad", "没走成", "手机连不上刷步接口，换网络或稍后再试。");
+        showResult("bad", "没走成", breakText("network"));
       } else {
-        showResult("bad", "没走成", String(err.message || err));
+        showResult("bad", "没走成", breakText("other", {}, err));
       }
     } finally {
       button.disabled = false;
