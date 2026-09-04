@@ -197,7 +197,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
       if (!cfg) {
         return json({
           ok: false,
-          error: "马上刷只要 Zepp 账号和密码。在 Worker 里执行 wrangler secret put USER 和 wrangler secret put PWD，不要把整份 CONFIG（推送 Token）贴进来。",
+          error: "马上刷还差 Worker 里的 CONFIG。把仓库那份 JSON 贴进去即可，不必放 GitHub PAT。",
         }, 503, origin, env);
       }
       const now = new Date();

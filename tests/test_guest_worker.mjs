@@ -401,7 +401,7 @@ test("owner-run returns 503 when USER/PWD are missing after password check", asy
   const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-config"), ownerEnv());
   const payload = await read(res);
   assert.equal(payload.status, 503);
-  assert.match(payload.body.error, /USER|PWD|账号/);
+  assert.match(payload.body.error, /CONFIG|USER|PWD|账号/);
 });
 
 test("owner-run syncs via Huami using Worker USER/PWD, not GitHub Actions", async () => {

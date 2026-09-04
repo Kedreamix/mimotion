@@ -111,7 +111,7 @@
       </summary>
       <div class="protected-note">
         <strong>不能在这里直接验证账号密码</strong>
-        <p>公开页不能提交 Zepp 密码。定时刷把完整 CONFIG（含推送）放到 GitHub Secret。马上刷只在 Worker 里放 USER、PWD，不要贴推送 Token，也不会发 PushPlus。</p>
+        <p>公开页不能提交 Zepp 密码。定时刷把完整 CONFIG 放到 GitHub Secret。马上刷可以把同一份贴到 Worker，不必放 PAT。Worker 这条链不会发 PushPlus。</p>
       </div>
       <form id="secret-form" class="form-grid secret-grid"></form>
       <pre id="config-preview" class="json"></pre>

@@ -5,13 +5,12 @@
 ```bash
 npx wrangler deploy
 npx wrangler secret put OWNER_PASSWORD
-npx wrangler secret put USER
-npx wrangler secret put PWD
+npx wrangler secret put CONFIG
 ```
 
 `OWNER_PASSWORD` 是看板上的站长密码，**不要**写进 GitHub Variables、`params.json` 或网页。
 
-马上刷只要 Zepp 的 `USER` / `PWD`（多个账号仍可用 `#` 分隔）。**不要**把 GitHub 整份 `CONFIG` 贴进来：那里还有 PushPlus、企业微信、Telegram，Worker 这条链也不会发推送。GitHub `PAT` 也不用放到 Worker。定时任务继续读仓库 Secret。
+`CONFIG` 可以和仓库 GitHub Secret 那份 JSON 相同。Worker 只用里面的 `USER` / `PWD`（以及可选的步数范围），**不会**发 PushPlus / 企业微信 / Telegram。GitHub `PAT` **不要**放到 Worker。定时任务继续读仓库 Secret。
 
 `keep_vars = true`，之后部署不会冲掉密钥。
 
@@ -24,5 +23,5 @@ Cloudflare 控制台路径：Workers & Pages → `mimotion` → Settings → Var
 本地：
 
 ```bash
-OWNER_PASSWORD=demo USER=a@b.com PWD=x node worker/dev-server.mjs
+OWNER_PASSWORD=demo CONFIG='{"USER":"a@b.com","PWD":"x"}' node worker/dev-server.mjs
 ```

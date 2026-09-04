@@ -305,7 +305,7 @@
       if (!body.configured) {
         ready.textContent = "站长刷步还没配置完成。";
       } else if (!body.hasAccount && !body.hasConfig) {
-        ready.textContent = "还差 Worker 里的 USER 和 PWD，不用贴整份 CONFIG。";
+        ready.textContent = "还差 Worker 里的 CONFIG。仓库那份 JSON 即可，不用贴 PAT。";
       }
     } catch {
       /* Worker 未部署时静默忽略，用户还是可以尝试输密码 */
