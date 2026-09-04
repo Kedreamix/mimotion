@@ -6,21 +6,9 @@ export function hasAnalytics(env = {}) {
   return Boolean(env && env.USAGE && typeof env.USAGE.writeDataPoint === "function");
 }
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS guest_runs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  created_at TEXT NOT NULL,
-  user TEXT NOT NULL,
-  ok INTEGER NOT NULL,
-  step INTEGER,
-  stage TEXT,
-  error TEXT,
-  elapsed_ms INTEGER,
-  kind TEXT NOT NULL DEFAULT 'guest'
-);
-CREATE INDEX IF NOT EXISTS idx_guest_runs_kind ON guest_runs(kind);
-CREATE INDEX IF NOT EXISTS idx_guest_runs_created ON guest_runs(created_at);
-`;
+const CREATE_TABLE = "CREATE TABLE IF NOT EXISTS guest_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, user TEXT NOT NULL, ok INTEGER NOT NULL, step INTEGER, stage TEXT, error TEXT, elapsed_ms INTEGER, kind TEXT NOT NULL DEFAULT 'guest')";
+const CREATE_KIND_INDEX = "CREATE INDEX IF NOT EXISTS idx_guest_runs_kind ON guest_runs(kind)";
+const CREATE_CREATED_INDEX = "CREATE INDEX IF NOT EXISTS idx_guest_runs_created ON guest_runs(created_at)";
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -60,9 +48,17 @@ export function usageRow({
   return row;
 }
 
-async function ensureSchema(db) {
-  if (!db || typeof db.exec !== "function") return;
-  await db.exec(SCHEMA);
+async function runSql(db, sql) {
+  const stmt = db.prepare(sql);
+  if (typeof stmt.run === "function") return stmt.run();
+  if (typeof stmt.bind === "function") return stmt.bind().run();
+}
+
+export async function ensureSchema(db) {
+  if (!db || typeof db.prepare !== "function") return;
+  await runSql(db, CREATE_TABLE);
+  await runSql(db, CREATE_KIND_INDEX);
+  await runSql(db, CREATE_CREATED_INDEX);
 }
 
 async function insertUsage(db, row) {
