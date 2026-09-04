@@ -2,6 +2,8 @@
 
 游客刷步，以及站长用独立密码刷自己的账号。正式看板在 [https://kedreamix.github.io/mimotion/](https://kedreamix.github.io/mimotion/)。 Cloudflare 控制台里的 Worker 名叫 `mimotion`。
 
+公开 `GET /today-steps` 用 Worker Secret `CONFIG` 登录华米，读当天 `stp.ttl`。看板大数字用这个接口，不要求站长密码。结果走 Cache API（约 3 分钟），`?fresh=1` 会绕过缓存。成功的 `POST /owner-run` 会改写这份缓存。改完代码后需要重新部署 Worker，看板才能拉到华米数。
+
 ```bash
 npx wrangler deploy
 npx wrangler secret put OWNER_PASSWORD

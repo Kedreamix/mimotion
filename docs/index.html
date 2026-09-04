@@ -56,7 +56,8 @@
         </div>
         <div class="step-number"><strong id="last-step">—</strong><span>步</span></div>
         <div class="bar" aria-hidden="true"><i id="bar-value"></i></div>
-        <span class="muted" id="step-date">等待数据</span>
+        <span class="muted" id="step-date">等待华米数据</span>
+        <p class="cron-last muted" id="cron-last">上次定时 —</p>
       </div>
       <dl class="facts">
         <div>
@@ -96,7 +97,7 @@
         <button id="run-now" class="primary run-button" type="button">马上刷步 <span>→</span></button>
       </div>
       <div class="owner-meta">
-        <span>刷完以 Zepp 为准，看板数字等下次定时才更新</span>
+        <span>今日步数是华米当天；上次定时是仓库记下的上传，不是实时</span>
         <a href="./settings.html">改定时参数 →</a>
       </div>
       <p id="ops-status" class="banner" hidden></p>

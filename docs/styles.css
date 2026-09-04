@@ -552,6 +552,11 @@ body { letter-spacing: -0.01em; }
 .step-number > span { color: var(--muted); font-size: 13px; }
 .bar { height: 6px; max-width: 300px; margin-bottom: 10px; }
 .bar i { background: linear-gradient(90deg, #ff6846, #ffad6c); box-shadow: 0 0 16px rgba(255,104,70,.3); }
+.cron-last {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .facts { gap: 0; padding: 5px 0; }
 .facts div { padding: 2px 14px; }
 .facts div:not(:first-child) { padding-left: 14px; }
