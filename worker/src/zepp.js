@@ -283,7 +283,7 @@ async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
 async function postBandData(step, appToken, userId, fetchImpl, now) {
   const t = beijingTs(now);
   const dataJson = applyBandTemplate(String(step), todayBeijing(now));
-  const res = await timedFetch(fetchImpl, `https://api-mifit-cn.huami.com/v1/data/band_data.json?&t=${t}&r=${uuid()}`, {
+  const res = await timedFetch(fetchImpl, `${DEFAULT_BAND_HOST}/v1/data/band_data.json?&t=${t}&r=${uuid()}`, {
     method: "POST",
     headers: {
       apptoken: appToken,
@@ -301,6 +301,60 @@ async function postBandData(step, appToken, userId, fetchImpl, now) {
   return body.message;
 }
 
+function summaryQuery(userId, date, extra = {}) {
+  const t = beijingTs();
+  return new URLSearchParams({
+    query_type: "summary",
+    userid: String(userId),
+    from_date: date,
+    to_date: date,
+    t,
+    r: uuid(),
+    ...extra,
+  });
+}
+
+function huamiStatusError(prefix, status, text) {
+  const parsed = tryJson(text);
+  const hint = parsed && parsed.message ? String(parsed.message).slice(0, 80) : "";
+  return new Error(hint ? `${prefix}${status} ${hint}` : `${prefix}${status}`);
+}
+
+async function getBandSummary(appToken, userId, date, fetchImpl) {
+  const attempts = [
+    { device_type: "android_phone" },
+    { device_type: "0", byteLength: "8" },
+  ];
+  let lastError = new Error("读取步数异常");
+  for (const extra of attempts) {
+    const res = await timedFetch(fetchImpl, `${DEFAULT_BAND_HOST}/v1/data/band_data.json?${summaryQuery(userId, date, extra)}`, {
+      method: "GET",
+      headers: {
+        apptoken: appToken,
+        appname: "com.xiaomi.hm.health",
+        "user-agent": UA,
+      },
+    });
+    const text = await res.text();
+    if (res.status !== 200) {
+      lastError = huamiStatusError("读取步数异常：", res.status, text);
+      continue;
+    }
+    const body = tryJson(text);
+    if (!body) {
+      lastError = new Error("读取步数失败");
+      continue;
+    }
+    const code = Number(body.code);
+    if (body.message && body.message !== "success" && code !== 1) {
+      lastError = new Error(body.message || "读取步数失败");
+      continue;
+    }
+    return body;
+  }
+  throw lastError;
+}
+
 export async function fetchTodaySteps({ user, password, now, fetchImpl }) {
   const account = normalizeUser(user);
   const pwd = String(password || "").trim();
@@ -312,28 +366,7 @@ export async function fetchTodaySteps({ user, password, now, fetchImpl }) {
   const access = await loginAccessToken(account, pwd, fetchImpl);
   const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
   const date = todayBeijing(now);
-  const host = tokens.regionHost || DEFAULT_BAND_HOST;
-  const query = new URLSearchParams({
-    query_type: "summary",
-    userid: String(tokens.userId),
-    from_date: date,
-    to_date: date,
-  });
-  const res = await timedFetch(fetchImpl, `${host}/v1/data/band_data.json?${query}`, {
-    method: "GET",
-    headers: {
-      apptoken: tokens.appToken,
-      appname: "com.xiaomi.hm.health",
-    },
-  });
-  if (res.status !== 200) {
-    throw new Error(`读取步数异常：${res.status}`);
-  }
-  const body = await res.json();
-  const code = Number(body && body.code);
-  if (body && body.message && body.message !== "success" && code !== 1) {
-    throw new Error(body.message || "读取步数失败");
-  }
+  const body = await getBandSummary(tokens.appToken, tokens.userId, date, fetchImpl);
   return {
     date,
     steps: stepsFromBandData(body, date),
