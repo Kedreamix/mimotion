@@ -118,7 +118,13 @@
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ user, password, step: value }),
+        body: JSON.stringify({
+          user,
+          password,
+          step: value,
+          min_step: value,
+          max_step: value,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       $("password").value = "";

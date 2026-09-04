@@ -176,10 +176,10 @@ dd.muted { font-size: 12px; margin-top: 3px; }
 .hour-row li.miss { opacity: 0.55; }
 
 .guest-card {
-  padding: 16px 18px 14px;
+  padding: 0;
   margin-bottom: 12px;
   background:
-    linear-gradient(120deg, rgba(61, 214, 140, 0.08), transparent 42%),
+    linear-gradient(120deg, rgba(255, 90, 31, 0.12), transparent 48%),
     var(--card);
 }
 .guest-card h2 { margin: 4px 0 6px; font-size: 17px; }
@@ -694,7 +694,12 @@ input:focus, select:focus {
   box-shadow: inset 0 0 18px rgba(255,104,70,.05);
 }
 
-.guest-card { padding: 0; background: var(--card); }
+.guest-card {
+  padding: 0;
+  background:
+    linear-gradient(120deg, rgba(255, 90, 31, 0.12), transparent 48%),
+    var(--card);
+}
 .guest-card > summary { list-style: none; }
 .guest-card > summary::-webkit-details-marker { display: none; }
 .guest-summary {
@@ -713,8 +718,8 @@ input:focus, select:focus {
   width: 38px;
   height: 38px;
   border-radius: 13px;
-  color: var(--ok);
-  background: rgba(61,214,140,.09);
+  color: var(--orange);
+  background: rgba(255, 90, 31, 0.12);
   font-size: 18px;
 }
 .guest-summary small { display: block; color: var(--muted); font-size: 10px; margin-bottom: 3px; }
