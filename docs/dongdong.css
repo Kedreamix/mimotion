@@ -230,7 +230,7 @@ h1 { margin: 8px 0 4px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.04
   letter-spacing: 0;
   font-weight: 700;
 }
-.pass form, .hint, .status { padding: 0 18px; }
+.pass form, .hint, .result { padding: 0 18px; }
 .pass form { padding-top: 16px; }
 .pass-lead {
   margin: 0 0 14px;
@@ -272,9 +272,29 @@ input:focus {
 }
 .go span { font-weight: 500; }
 .go:disabled { opacity: 0.6; cursor: wait; }
-.status { margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
-.status.ok { color: var(--ok); }
-.status.bad { color: var(--bad); }
+.result {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+}
+.result strong { display: block; font-size: 15px; }
+.result p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.result.wait {
+  border-color: rgba(255, 90, 31, 0.35);
+  background: rgba(255, 90, 31, 0.08);
+}
+.result.wait strong { color: var(--orange); }
+.result.ok {
+  border-color: rgba(61, 214, 140, 0.35);
+  background: rgba(61, 214, 140, 0.08);
+}
+.result.ok strong { color: var(--ok); }
+.result.bad {
+  border-color: rgba(255, 93, 115, 0.35);
+  background: rgba(255, 93, 115, 0.08);
+}
+.result.bad strong { color: var(--bad); }
 .hint { margin: 10px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 .about {

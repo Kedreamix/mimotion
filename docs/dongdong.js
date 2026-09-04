@@ -1,6 +1,7 @@
 (() => {
   const KEY = "mimo-dongdong-theme";
   const RING = 2 * Math.PI * 58;
+  const REQUEST_MS = 20000;
   const $ = (id) => document.getElementById(id);
   const PRESETS = [3000, 8000, 12000, 20000, 30000];
 
@@ -67,12 +68,14 @@
   });
   setStep(20000);
 
-  function show(text, ok, arrived) {
-    const el = $("status");
+  function showResult(kind, title, detail) {
+    const el = $("result");
     el.hidden = false;
-    el.className = "status " + (ok ? "ok" : "bad");
-    el.textContent = text;
-    document.querySelector(".watch").classList.toggle("done", Boolean(arrived));
+    el.className = "result " + kind;
+    $("result-title").textContent = title;
+    $("result-detail").textContent = detail || "";
+    document.querySelector(".watch").classList.toggle("done", kind === "ok");
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   async function ping() {
@@ -96,44 +99,68 @@
   }
   ping();
 
+  function abortAfter(ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    return { signal: ctrl.signal, cancel: () => clearTimeout(timer) };
+  }
+
   $("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const user = ($("user").value || "").trim();
     const password = $("password").value || "";
     const value = setStep($("step").value);
     if (!user || !password) {
-      show("先填自己的账号和密码。", false);
+      showResult("bad", "还没出发", "先填自己的账号和密码。");
       return;
     }
     const endpoint = window.MIMO_GUEST_API;
     if (!endpoint) {
-      show("这一趟暂时走不了。", false);
+      showResult("bad", "没走成", "这一趟暂时走不了。");
       return;
     }
     const button = $("submit");
     button.disabled = true;
     button.textContent = "在路上…";
-    show("正在把今天的步数送出去…", true);
+    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp，大约几秒。下面变成「刷成功了」才算数。`);
+    const wait = abortAfter(REQUEST_MS);
     try {
       const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ user, password, step: value }),
+        body: JSON.stringify({
+          user,
+          password,
+          step: value,
+          min_step: value,
+          max_step: value,
+        }),
+        signal: wait.signal,
       });
       const body = await res.json().catch(() => ({}));
       $("password").value = "";
       if (!res.ok || !body.ok) {
-        show(body.error || `没走成（${res.status}）`, false);
+        showResult("bad", "没走成", body.error || `接口返回 ${res.status}`);
         return;
       }
-      show(body.message || `这一趟到了，${Number(body.step).toLocaleString("zh-CN")} 步`, true, true);
+      const step = Number(body.step);
+      showResult(
+        "ok",
+        `刷成功了 · ${format(step)} 步`,
+        `账号 ${body.user || "已提交"} 今天已同步 ${format(step)} 步。打开 Zepp Life 下拉刷新就能看到。支付宝 / 微信可能要再等一会儿。`,
+      );
     } catch (err) {
       $("password").value = "";
       const msg = String(err.message || err);
-      show(msg.includes("Failed to fetch") || msg.includes("Load failed")
-        ? "这一趟暂时走不了，稍后再试。"
-        : msg, false);
+      if (err.name === "AbortError" || msg.includes("aborted")) {
+        showResult("bad", "没走成", "等了 20 秒华米还没回。这趟没有刷上，请再点一次。");
+      } else if (msg.includes("Failed to fetch") || msg.includes("Load failed")) {
+        showResult("bad", "没走成", "连不上刷步接口，稍后再试。");
+      } else {
+        showResult("bad", "没走成", msg);
+      }
     } finally {
+      wait.cancel();
       button.disabled = false;
       button.innerHTML = "走这一趟 <span>→</span>";
     }
