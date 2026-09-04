@@ -4,10 +4,26 @@ import { BAND_TEMPLATE } from "./band-template.js";
 const UA = "MiFit6.14.0 (M2007J1SC; Android 12; Density/2.75)";
 
 export function normalizeUser(raw) {
-  const user = String(raw || "").trim();
+  let user = String(raw || "").trim();
   if (!user) return "";
-  if (user.startsWith("+86") || user.includes("@")) return user;
+  if (user.includes("@")) return user.replace(/\s+/g, "");
+  user = user.replace(/[\s-]/g, "");
+  if (user.startsWith("+86")) return user;
+  if (/^86\d{11}$/.test(user)) return `+${user}`;
   return `+86${user}`;
+}
+
+export function describeLoginError(code) {
+  let raw = String(code || "unknown");
+  try {
+    raw = decodeURIComponent(raw.replace(/\+/g, " "));
+  } catch {
+    /* keep raw */
+  }
+  if (raw === "401" || raw === "403" || /unauthorized/i.test(raw)) {
+    return "账号或密码不对。请用 Zepp Life 自己的邮箱/手机和密码，不要用小米账号快捷登录。";
+  }
+  return `获取 accessToken 失败 ${raw}`;
 }
 
 export function maskUser(user) {
@@ -113,7 +129,7 @@ async function loginAccessToken(user, password, fetchImpl) {
   const access = (location.match(/access=([^&]+)/) || [])[1];
   if (!access) {
     const err = (location.match(/error=([^&]+)/) || [])[1] || "unknown";
-    throw new Error(`获取 accessToken 失败 ${err}`);
+    throw new Error(describeLoginError(err));
   }
   return decodeURIComponent(access);
 }
@@ -192,7 +208,8 @@ async function postBandData(step, appToken, userId, fetchImpl, now) {
 
 export async function guestSync({ user, password, minStep, maxStep, step, now, fetchImpl }) {
   const account = normalizeUser(user);
-  if (!account || !password) {
+  const pwd = String(password || "").trim();
+  if (!account || !pwd) {
     throw new Error("请填写自己的 Zepp Life 账号和密码");
   }
   const started = Date.now();
@@ -209,7 +226,7 @@ export async function guestSync({ user, password, minStep, maxStep, step, now, f
     const isPhone = account.startsWith("+86");
     const deviceId = uuid();
     stage = "login";
-    const access = await loginAccessToken(account, password, fetchImpl);
+    const access = await loginAccessToken(account, pwd, fetchImpl);
     stamp("login");
     stage = "grant";
     const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);

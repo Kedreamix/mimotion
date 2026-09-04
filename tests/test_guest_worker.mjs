@@ -3,7 +3,7 @@ import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
 import { handleRequest } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
-import { applyBandTemplate, clampStep, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
+import { applyBandTemplate, clampStep, describeLoginError, maskUser, normalizeUser, stepRangeByTime } from "../worker/src/zepp.js";
 import { createLimiter } from "../worker/src/rate-limit.js";
 
 const PYTHON_PLAIN = "emailOrPhone=%2B8613800138000&password=secret&state=REDIRECTION&client_id=HuaMi&country_code=CN&token=access&redirect_uri=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fhm-registration%2Fsuccesssignin.html";
@@ -36,8 +36,14 @@ test("AES-CBC matches Python Huami login encryption", async () => {
 
 test("normalize phone and mask user", () => {
   assert.equal(normalizeUser("13800138000"), "+8613800138000");
+  assert.equal(normalizeUser("86 138-0013-8000"), "+8613800138000");
   assert.equal(normalizeUser("a@b.com"), "a@b.com");
   assert.equal(maskUser("+8613800138000"), "+86****8000");
+});
+
+test("describeLoginError turns Huami 401 into a password hint", () => {
+  assert.match(describeLoginError("401"), /账号或密码不对/);
+  assert.match(describeLoginError("oops"), /oops/);
 });
 
 test("clampStep stays within 1 and 98800", () => {
@@ -183,6 +189,27 @@ test("guest handler accepts an exact step", async () => {
   const payload = await read(res);
   assert.equal(payload.status, 200);
   assert.equal(payload.body.step, 98800);
+});
+
+test("guest handler maps Huami login 401 to a password error", async () => {
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?error=401&" },
+    },
+  ]);
+  const res = await handleRequest(new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "guest-401" },
+    body: JSON.stringify({ user: "a@b.com", password: "wrong", step: 3000 }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io" }, fetchImpl);
+  const payload = await read(res);
+  assert.equal(payload.status, 400);
+  assert.equal(payload.body.ok, false);
+  assert.equal(payload.body.stage, "login");
+  assert.match(payload.body.error, /账号或密码不对/);
 });
 
 test("guest handler returns huami-wait when Huami never answers", async () => {

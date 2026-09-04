@@ -98,12 +98,17 @@
       return "请求已经发出，但这一页没等到回执。后台仍可能已经刷上。请打开 Zepp Life 下拉刷新核对今天的步数，不要连点。";
     }
     const names = { login: "登录华米 api-user.zepp.com", grant: "换票 account.huami.com", upload: "上传 api-mifit-cn.huami.com", worker: "Worker 内部", "huami-wait": "Worker 等华米总超时" };
+    const errorText = String((err && err.message) || (body && body.error) || "");
+    if ((body && body.stage === "login" && /401|403|unauthorized/i.test(errorText))
+      || /accessToken 失败\s*401/.test(errorText)) {
+      return "华米拒绝登录：账号或密码不对。请用 Zepp Life 自己的邮箱/手机和密码，不要用小米账号快捷登录。";
+    }
     if (body && body.stage) {
       const where = names[body.stage] || body.stage;
       const extra = formatTrace(body.trace, body.elapsed_ms);
-      return `断在：${where}。${body.error || ""} ${extra}`.trim();
+      return `断在：${where}。${errorText} ${extra}`.trim();
     }
-    return String((err && err.message) || (body && body.error) || "未知错误");
+    return errorText || "未知错误";
   }
 
   function showReceipt({ step, user, trace, elapsed_ms }) {
@@ -176,7 +181,7 @@
   $("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const user = ($("user").value || "").trim();
-    const password = $("password").value || "";
+    const password = ($("password").value || "").trim();
     const value = setStep($("step").value);
     if (!user || !password) {
       showResult("bad", "还没出发", "先填自己的账号和密码。");
