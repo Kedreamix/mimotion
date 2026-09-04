@@ -93,6 +93,21 @@ async function runSync(user, password, body, fetchImpl) {
   });
 }
 
+function withDeadline(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`华米这头超过 ${Math.max(1, Math.round(ms / 1000))} 秒还没跑完`);
+      err.stage = "huami-wait";
+      err.elapsed_ms = ms;
+      reject(err);
+    }, ms);
+  });
+  const guarded = Promise.resolve(promise);
+  guarded.catch(() => {});
+  return Promise.race([guarded, timeout]).finally(() => clearTimeout(timer));
+}
+
 function ownerPat(env) {
   return env.PAT || env.OWNER_GITHUB_PAT || "";
 }
@@ -202,7 +217,9 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
         message: "已触发 GitHub Actions 刷步，账号从仓库 CONFIG 读取，稍后可在 Actions 页面查看进度",
       }, 200, origin, env);
     } else {
-      result = await runSync(body.user, body.password, body, fetchImpl);
+      const rawDeadline = Number(env.GUEST_DEADLINE_MS);
+      const deadlineMs = Number.isFinite(rawDeadline) && rawDeadline > 0 ? rawDeadline : 20000;
+      result = await withDeadline(runSync(body.user, body.password, body, fetchImpl), deadlineMs);
     }
     return json({
       ok: true,

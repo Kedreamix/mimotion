@@ -185,6 +185,20 @@ test("guest handler accepts an exact step", async () => {
   assert.equal(payload.body.step, 98800);
 });
 
+test("guest handler returns huami-wait when Huami never answers", async () => {
+  const fetchImpl = () => new Promise(() => {});
+  const res = await handleRequest(new Request("https://guest.test/guest-run", {
+    method: "POST",
+    headers: { Origin: "https://kedreamix.github.io", "content-type": "application/json", "CF-Connecting-IP": "guest-deadline" },
+    body: JSON.stringify({ user: "13800138000", password: "guest-secret", step: 3000 }),
+  }), { ALLOWED_ORIGINS: "https://kedreamix.github.io", GUEST_DEADLINE_MS: 40 }, fetchImpl);
+  const payload = await read(res);
+  assert.equal(payload.status, 400);
+  assert.equal(payload.body.ok, false);
+  assert.equal(payload.body.stage, "huami-wait");
+  assert.match(payload.body.error, /20 秒|没跑完/);
+});
+
 test("safeEqual rejects mismatched passwords", () => {
   assert.equal(safeEqual("secret", "secret"), true);
   assert.equal(safeEqual("secret", "wrong"), false);
