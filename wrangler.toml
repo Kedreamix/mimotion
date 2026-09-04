@@ -19,12 +19,11 @@ enabled = true
 binding = "USAGE"
 dataset = "mimotion_usage"
 
-# D1：先在控制台建库 mimotion，绑到 Worker 变量 DB。
-# git 部署要写上 database_id，否则可能冲掉控制台绑定。把 UUID 填到下面再取消注释。
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "mimotion"
-# database_id = "你的-d1-database-id"
+# D1 库 mimotion，绑到 Worker 变量 DB。database_id 来自控制台。
+[[d1_databases]]
+binding = "DB"
+database_name = "mimotion"
+database_id = "a44e3fba-d5e2-4a0f-8b4a-589e7febe0d7"
 
 [vars]
 ALLOWED_ORIGINS = "https://kedreamix.github.io/mimotion,http://127.0.0.1:8765,http://localhost:8765,http://127.0.0.1:8787"

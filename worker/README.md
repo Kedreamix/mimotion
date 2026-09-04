@@ -27,7 +27,7 @@ Cloudflare 控制台路径：Workers & Pages → `mimotion` → Settings → Var
 
 控制台操作：
 
-1. **D1**：Workers & Pages → D1 SQL database → Create `mimotion` → 绑到 Worker `mimotion`，Variable name `DB`。把 database id 填进根目录 `wrangler.toml` 的 `[[d1_databases]]`。
+1. **D1**：已写入 `wrangler.toml`（库名 `mimotion`，绑定 `DB`）。控制台建库后绑到 Worker `mimotion`，Variable name 必须是 `DB`。
 2. **Analytics Engine**：Worker `mimotion` → Settings → Bindings → Add → Analytics Engine，Variable name `USAGE`，dataset `mimotion_usage`。没有单独「新建库」页。
 
 没绑定时迈步照常工作，只是不记账。密码不会写入 D1。
