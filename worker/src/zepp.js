@@ -61,7 +61,7 @@ function formBody(data) {
   return new URLSearchParams(data).toString();
 }
 
-async function timedFetch(fetchImpl, url, options, ms = 8000) {
+async function timedFetch(fetchImpl, url, options, ms = 12000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {

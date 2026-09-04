@@ -1,7 +1,7 @@
 (() => {
   const KEY = "mimo-dongdong-theme";
   const RING = 2 * Math.PI * 58;
-  const REQUEST_MS = 20000;
+  const REQUEST_MS = 45000;
   const $ = (id) => document.getElementById(id);
   const PRESETS = [3000, 8000, 12000, 20000, 30000];
 
@@ -140,6 +140,28 @@
     return { signal: ctrl.signal, cancel: () => clearTimeout(timer) };
   }
 
+  async function postGuest(endpoint, payload, signal) {
+    const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+      keepalive: true,
+    });
+    const body = await res.json().catch(() => ({}));
+    return { res, body };
+  }
+
+  function isAbort(err) {
+    const msg = String(err && err.message || err);
+    return (err && err.name === "AbortError") || msg.includes("aborted");
+  }
+
+  function isNetwork(err) {
+    const msg = String(err && err.message || err);
+    return msg.includes("Failed to fetch") || msg.includes("Load failed");
+  }
+
   $("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const user = ($("user").value || "").trim();
@@ -154,45 +176,49 @@
       showResult("bad", "没走成", "这一趟暂时走不了。");
       return;
     }
+    const payload = { user, password, step: value, min_step: value, max_step: value };
     const button = $("submit");
     button.disabled = true;
     button.textContent = "在路上…";
-    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp，大约几秒。变成「这一趟到了」的回执才算成功。`);
-    const wait = abortAfter(REQUEST_MS);
+    showResult("wait", "还在路上，还没成功", `正在把 ${format(value)} 步送给 Zepp。手机上可能要十几秒，变成「这一趟到了」才算成功。`);
+
+    async function attempt() {
+      const wait = abortAfter(REQUEST_MS);
+      try {
+        return await postGuest(endpoint, payload, wait.signal);
+      } finally {
+        wait.cancel();
+      }
+    }
+
     try {
-      const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          user,
-          password,
-          step: value,
-          min_step: value,
-          max_step: value,
-        }),
-        signal: wait.signal,
-      });
-      const body = await res.json().catch(() => ({}));
-      $("password").value = "";
+      let out;
+      try {
+        out = await attempt();
+      } catch (err) {
+        if (!isAbort(err) && !isNetwork(err)) throw err;
+        showResult("wait", "还在路上，正在再试一次", "刚才这趟没等到回执，正在重发，请再等一会儿。");
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        out = await attempt();
+      }
+      const { res, body } = out;
       if (!res.ok || !body.ok) {
         showResult("bad", "没走成", body.error || `接口返回 ${res.status}`);
         return;
       }
+      $("password").value = "";
       const step = Number(body.step);
       setStep(step);
       showReceipt({ step, user: body.user });
     } catch (err) {
-      $("password").value = "";
-      const msg = String(err.message || err);
-      if (err.name === "AbortError" || msg.includes("aborted")) {
-        showResult("bad", "没走成", "等了 20 秒华米还没回。这趟没有刷上，请再点一次。");
-      } else if (msg.includes("Failed to fetch") || msg.includes("Load failed")) {
-        showResult("bad", "没走成", "连不上刷步接口，稍后再试。");
+      if (isAbort(err)) {
+        showResult("bad", "没走成", "等了较久还没收到回执。接口本身能刷成功，请再点一次，不要连点。");
+      } else if (isNetwork(err)) {
+        showResult("bad", "没走成", "手机连不上刷步接口，换网络或稍后再试。");
       } else {
-        showResult("bad", "没走成", msg);
+        showResult("bad", "没走成", String(err.message || err));
       }
     } finally {
-      wait.cancel();
       button.disabled = false;
       button.innerHTML = "走这一趟 <span>→</span>";
     }

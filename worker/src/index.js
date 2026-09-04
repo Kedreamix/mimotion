@@ -28,7 +28,7 @@ async function triggerWorkflowDispatch({ repo, pat, workflowId = "run.yml", inpu
 }
 
 const limiterStore = new Map();
-const limiter = createLimiter(limiterStore, { limit: 5, windowMs: 10 * 60 * 1000 });
+const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
 
 const DEFAULT_PAGES_ORIGIN = "https://kedreamix.github.io/mimotion";
 
