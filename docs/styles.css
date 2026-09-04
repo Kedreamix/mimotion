@@ -957,45 +957,108 @@ html[data-theme="light"] .facts div:not(:first-child) {
 .usage-list .fail { color: var(--bad); }
 
 html[data-skin="pikachu"] {
-  --bg: #1a1408;
-  --card: rgba(42, 32, 12, 0.92);
+  --bg: #110e08;
+  --card: rgba(35, 29, 15, 0.94);
   --orange: #F7D948;
   --ok: #F7D948;
-  --link: #FFE566;
-  --text: #fff6c8;
-  --muted: #c9b56a;
-  --line: rgba(247, 217, 72, 0.18);
+  --link: #ffea84;
+  --text: #fff8d8;
+  --muted: #bcae72;
+  --line: rgba(255, 222, 81, 0.2);
+  --line-strong: rgba(255, 222, 81, 0.34);
+  --fill: rgba(255, 218, 54, 0.055);
+  --label: #e4d490;
+  --pill: #dfcf8a;
 }
 html[data-skin="pikachu"][data-theme="light"] {
-  --bg: #fff4b8;
-  --card: rgba(255, 250, 214, 0.94);
+  --bg: #f7e9a5;
+  --card: rgba(255, 251, 222, 0.96);
   --text: #3a2a10;
-  --muted: #7a6420;
-  --orange: #E2B400;
-  --ok: #8a6a00;
+  --muted: #745f20;
+  --orange: #d59e00;
+  --ok: #6f5a00;
+  --link: #4d3907;
+  --line: rgba(74, 54, 7, 0.16);
+  --line-strong: rgba(74, 54, 7, 0.27);
+  --fill: rgba(88, 65, 8, 0.055);
 }
 html[data-skin="pikachu"] .bg,
 html[data-skin="pikachu"] .glow {
   background:
-    radial-gradient(680px 320px at 12% -10%, rgba(247, 217, 72, 0.35), transparent 58%),
-    radial-gradient(420px 240px at 92% 18%, rgba(227, 53, 13, 0.18), transparent 62%),
-    linear-gradient(180deg, #2a210c, var(--bg) 42%);
+    radial-gradient(780px 360px at 8% -10%, rgba(255, 218, 45, 0.27), transparent 61%),
+    radial-gradient(440px 300px at 96% 16%, rgba(227, 53, 13, 0.15), transparent 68%),
+    linear-gradient(135deg, transparent 48%, rgba(247, 217, 72, 0.025) 49%, rgba(247, 217, 72, 0.025) 51%, transparent 52%),
+    linear-gradient(180deg, #211a0b, var(--bg) 45%);
+  background-size: auto, auto, 72px 72px, auto;
 }
 html[data-skin="pikachu"][data-theme="light"] .bg,
 html[data-skin="pikachu"][data-theme="light"] .glow {
   background:
-    radial-gradient(680px 320px at 12% -10%, rgba(247, 217, 72, 0.55), transparent 58%),
-    linear-gradient(180deg, #fff7cc, var(--bg) 42%);
+    radial-gradient(760px 360px at 10% -8%, rgba(255, 210, 20, 0.5), transparent 62%),
+    radial-gradient(420px 280px at 96% 16%, rgba(227, 53, 13, 0.11), transparent 67%),
+    linear-gradient(180deg, #fff8cf, var(--bg) 45%);
 }
 html[data-skin="pikachu"] .logo {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231a1408'/%3E%3Cpath d='M18 22 L12 6 L20 18 Z' fill='%23F7D948'/%3E%3Cpath d='M46 22 L52 6 L44 18 Z' fill='%23F7D948'/%3E%3Cpath d='M12 6 L14 2 L16 8 Z' fill='%231c140a'/%3E%3Cpath d='M52 6 L50 2 L48 8 Z' fill='%231c140a'/%3E%3Ccircle cx='32' cy='36' r='16' fill='%23F7D948'/%3E%3Ccircle cx='22' cy='40' r='4.2' fill='%23E3350D'/%3E%3Ccircle cx='42' cy='40' r='4.2' fill='%23E3350D'/%3E%3Ccircle cx='27' cy='34' r='2.1' fill='%231c140a'/%3E%3Ccircle cx='37' cy='34' r='2.1' fill='%231c140a'/%3E%3C/svg%3E") center / cover no-repeat;
+  width: 42px;
+  height: 42px;
+  background: url("./assets/spark-mascot.webp") center / cover no-repeat;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px #E3350D, 0 8px 24px rgba(247, 217, 72, 0.35);
+  box-shadow:
+    0 0 0 2px #ffd942,
+    0 0 0 4px rgba(227, 53, 13, 0.7),
+    0 10px 30px rgba(247, 217, 72, 0.28);
+  animation: spark-logo 2.8s ease-in-out infinite;
+}
+@keyframes spark-logo {
+  0%, 100% { filter: brightness(1); transform: translateY(0); }
+  50% { filter: brightness(1.13) drop-shadow(0 0 5px rgba(255, 218, 60, .55)); transform: translateY(-1px); }
+}
+html[data-skin="pikachu"] .glance,
+html[data-skin="pikachu"] .panel {
+  border-color: var(--line);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 235, 140, .04);
+}
+html[data-skin="pikachu"] .glance {
+  background:
+    radial-gradient(400px 180px at 5% 0%, rgba(247, 217, 72, .11), transparent 70%),
+    radial-gradient(220px 150px at 100% 100%, rgba(227, 53, 13, .09), transparent 72%),
+    var(--card);
+}
+html[data-skin="pikachu"] .action-card {
+  background:
+    linear-gradient(115deg, rgba(247, 217, 72, .09), transparent 42%),
+    radial-gradient(260px 180px at 100% 0%, rgba(227, 53, 13, .12), transparent 73%),
+    var(--card);
+}
+html[data-skin="pikachu"] .nav {
+  border-color: rgba(247, 217, 72, .2);
+}
+html[data-skin="pikachu"] .nav a.active,
+html[data-skin="pikachu"] .nav a:hover {
+  color: #211704;
+  background: linear-gradient(135deg, #ffe66d, #f4bd18);
+}
+html[data-skin="pikachu"] #theme-btn {
+  color: #2b1d04;
+  border-color: #f0bb19;
+  background: linear-gradient(135deg, #ffe86f, #e9ad0b);
+  box-shadow: 0 6px 18px rgba(247, 217, 72, .17);
 }
 html[data-skin="pikachu"] button.primary {
-  background: #F7D948;
+  background: linear-gradient(135deg, #ffe873, #f2bb16);
   color: #1a1408;
+  box-shadow: 0 10px 26px rgba(247, 217, 72, .18);
 }
 html[data-skin="pikachu"] .bar i {
   background: linear-gradient(90deg, #E3350D, #F7D948);
+  box-shadow: 0 0 16px rgba(247, 217, 72, .32);
+}
+html[data-skin="pikachu"] .owner-icon,
+html[data-skin="pikachu"] .guest-icon {
+  color: #2b1d04;
+  background: linear-gradient(135deg, #ffe879, #e9ae0e);
+}
+html[data-skin="pikachu"] .live-pill i {
+  background: #F7D948;
+  box-shadow: 0 0 9px rgba(247, 217, 72, .8);
 }

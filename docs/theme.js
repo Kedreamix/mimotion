@@ -5,22 +5,7 @@
   const ORDER = ["system", "light", "dark"];
   const mq = window.matchMedia("(prefers-color-scheme: light)");
   const DEFAULT_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E";
-  const PIKA_ICON = "data:image/svg+xml," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
-    + '<circle cx="32" cy="32" r="30" fill="#1a1408"/>'
-    + '<path d="M18 22 L12 6 L20 18 Z" fill="#F7D948" stroke="#3a2a10" stroke-width="1.5" stroke-linejoin="round"/>'
-    + '<path d="M46 22 L52 6 L44 18 Z" fill="#F7D948" stroke="#3a2a10" stroke-width="1.5" stroke-linejoin="round"/>'
-    + '<path d="M12 6 L14 2 L16 8 Z" fill="#1c140a"/>'
-    + '<path d="M52 6 L50 2 L48 8 Z" fill="#1c140a"/>'
-    + '<circle cx="32" cy="36" r="16" fill="#F7D948" stroke="#3a2a10" stroke-width="1.6"/>'
-    + '<circle cx="22" cy="40" r="4.2" fill="#E3350D"/>'
-    + '<circle cx="42" cy="40" r="4.2" fill="#E3350D"/>'
-    + '<circle cx="27" cy="34" r="2.1" fill="#1c140a"/>'
-    + '<circle cx="37" cy="34" r="2.1" fill="#1c140a"/>'
-    + '<path d="M29 44 Q32 47 35 44" fill="none" stroke="#1c140a" stroke-width="1.6" stroke-linecap="round"/>'
-    + '<path d="M46 28 L54 22 L50 30 Z" fill="#FFCB05" stroke="#3a2a10" stroke-width="1"/>'
-    + "</svg>",
-  );
+  const PIKA_ICON = "./assets/spark-favicon.png";
 
   function pref() {
     const saved = localStorage.getItem(KEY) || localStorage.getItem(OLD);
