@@ -1,6 +1,6 @@
 # Cloudflare Workers Builds 在仓库根目录执行 `npx wrangler deploy`。
 # 控制台里的 Worker 名叫 mimotion，必须和 name 一致。
-# keep_vars：部署时不要清掉控制台里单独加的变量。OWNER_PASSWORD / CONFIG 应做成 Secret，不要做成明文 Variable。
+# keep_vars：部署时不要清掉控制台里单独加的变量。OWNER_PASSWORD / USER / PWD 应做成 Secret，不要做成明文 Variable。
 name = "mimotion"
 main = "worker/src/index.js"
 compatibility_date = "2024-09-23"

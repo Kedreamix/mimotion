@@ -304,8 +304,8 @@
       const body = await res.json().catch(() => ({}));
       if (!body.configured) {
         ready.textContent = "站长刷步还没配置完成。";
-      } else if (!body.hasConfig) {
-        ready.textContent = "还差 Worker 里的 CONFIG。把 GitHub Secret 那份 JSON 原样贴进去。";
+      } else if (!body.hasAccount && !body.hasConfig) {
+        ready.textContent = "还差 Worker 里的 USER 和 PWD，不用贴整份 CONFIG。";
       }
     } catch {
       /* Worker 未部署时静默忽略，用户还是可以尝试输密码 */

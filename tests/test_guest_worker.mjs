@@ -366,14 +366,15 @@ test("owner-status reports whether worker secrets are configured", async () => {
   }), ownerEnv()));
   assert.equal(pwdOnly.body.configured, true);
   assert.equal(pwdOnly.body.hasPassword, true);
+  assert.equal(pwdOnly.body.hasAccount, false);
   assert.equal(pwdOnly.body.hasConfig, false);
   assert.equal(JSON.stringify(pwdOnly.body).includes("secret"), false);
 
   const ready = await read(await handleRequest(new Request("https://guest.test/owner-status", {
     headers: { Origin: "https://kedreamix.github.io" },
-  }), ownerEnv({ CONFIG: JSON.stringify({ USER: "a@b.com", PWD: "zepp-secret" }) })));
+  }), ownerEnv({ USER: "a@b.com", PWD: "zepp-secret" })));
   assert.equal(ready.body.configured, true);
-  assert.equal(ready.body.hasConfig, true);
+  assert.equal(ready.body.hasAccount, true);
   assert.equal(JSON.stringify(ready.body).includes("zepp-secret"), false);
 });
 
@@ -396,14 +397,14 @@ test("owner-run returns 401 for wrong password", async () => {
   assert.match(payload.body.error, /密码/);
 });
 
-test("owner-run returns 503 when CONFIG is missing after password check", async () => {
+test("owner-run returns 503 when USER/PWD are missing after password check", async () => {
   const res = await handleRequest(ownerRequest({ password: "secret" }, "ip-no-config"), ownerEnv());
   const payload = await read(res);
   assert.equal(payload.status, 503);
-  assert.match(payload.body.error, /CONFIG/);
+  assert.match(payload.body.error, /USER|PWD|账号/);
 });
 
-test("owner-run syncs via Huami using Worker CONFIG, not GitHub Actions", async () => {
+test("owner-run syncs via Huami using Worker USER/PWD, not GitHub Actions", async () => {
   const fetchImpl = mockFetch([
     {
       expectUrl: /api-user\.zepp\.com/,
@@ -424,10 +425,9 @@ test("owner-run syncs via Huami using Worker CONFIG, not GitHub Actions", async 
       body: JSON.stringify({ message: "success" }),
     },
   ]);
-  const config = JSON.stringify({ USER: "13800138000", PWD: "zepp-secret", MIN_STEP: "12000", MAX_STEP: "12000" });
   const res = await handleRequest(
     ownerRequest({ password: "secret", step: 12000 }, "ip-owner-ok"),
-    ownerEnv({ CONFIG: config }),
+    ownerEnv({ USER: "13800138000", PWD: "zepp-secret" }),
     fetchImpl,
   );
   const payload = await read(res);
@@ -437,6 +437,37 @@ test("owner-run syncs via Huami using Worker CONFIG, not GitHub Actions", async 
   assert.match(payload.body.message, /同步 12000 步/);
   assert.equal(JSON.stringify(payload.body).includes("zepp-secret"), false);
   assert.equal(JSON.stringify(payload.body).includes("secret"), false);
+});
+
+test("owner-run still accepts a slim CONFIG JSON as fallback", async () => {
+  const fetchImpl = mockFetch([
+    {
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 303,
+      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+    },
+    {
+      expectUrl: /account\.huami\.com/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
+    },
+    {
+      expectUrl: /band_data\.json/,
+      expectMethod: "POST",
+      status: 200,
+      body: JSON.stringify({ message: "success" }),
+    },
+  ]);
+  const res = await handleRequest(
+    ownerRequest({ password: "secret", step: 8000 }, "ip-owner-config"),
+    ownerEnv({ CONFIG: JSON.stringify({ USER: "a@b.com", PWD: "zepp-secret" }) }),
+    fetchImpl,
+  );
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.step, 8000);
 });
 
 test("owner-run returns 503 when CONFIG JSON is invalid", async () => {

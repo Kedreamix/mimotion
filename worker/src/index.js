@@ -1,4 +1,4 @@
-import { parseOwnerConfig } from "./config.js";
+import { parseOwnerAccounts } from "./config.js";
 import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
@@ -102,8 +102,13 @@ function withDeadline(promise, ms) {
 
 function ownerSecretStatus(env) {
   const hasPassword = Boolean(env.OWNER_PASSWORD);
-  const hasConfig = Boolean(String(env.CONFIG || "").trim());
-  return { hasPassword, hasConfig, configured: hasPassword };
+  let hasAccount = false;
+  try {
+    hasAccount = Boolean(parseOwnerAccounts(env));
+  } catch {
+    hasAccount = false;
+  }
+  return { hasPassword, hasAccount, hasConfig: hasAccount, configured: hasPassword };
 }
 
 export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = null) {
@@ -185,14 +190,14 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
       }
       let cfg;
       try {
-        cfg = parseOwnerConfig(env.CONFIG);
+        cfg = parseOwnerAccounts(env);
       } catch (err) {
         return json({ ok: false, error: String(err.message || err) }, 503, origin, env);
       }
       if (!cfg) {
         return json({
           ok: false,
-          error: "马上刷步还差 Worker 里的 CONFIG。GitHub Secret 读不出来，把仓库那份 JSON 原样执行 wrangler secret put CONFIG。",
+          error: "马上刷只要 Zepp 账号和密码。在 Worker 里执行 wrangler secret put USER 和 wrangler secret put PWD，不要把整份 CONFIG（推送 Token）贴进来。",
         }, 503, origin, env);
       }
       const now = new Date();
