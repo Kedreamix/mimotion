@@ -81,16 +81,25 @@ def persist_step_state():
         f.write("\n")
 
 
-# 在时间区间内随机，并保证相对上次成功提交严格递增（按天重置）
-def pick_incremental_step(user_key, min_step, max_step):
-    abs_max = get_int_value_default(config, 'MAX_STEP', 25000)
+def repo_last_step(user_key):
     state_key = _step_state_key(user_key)
     info = step_state.get(state_key) or {}
     last_date = info.get("last_step_date")
     last_step = int(info.get("last_step") or 0)
     if last_date != today_bj():
-        last_step = 0
+        return 0
+    return last_step
 
+
+def resolve_baseline(user_key, huami_steps):
+    if huami_steps is not None:
+        return max(0, int(huami_steps)), "huami"
+    return repo_last_step(user_key), "repo"
+
+
+# 在时间区间内随机，并保证相对当前步数严格递增（按天重置）
+def pick_incremental_step(min_step, max_step, baseline, abs_max):
+    last_step = max(0, int(baseline or 0))
     low = max(min_step, last_step + 1) if last_step > 0 else min_step
     high = max_step
     if low > high:
@@ -260,11 +269,22 @@ class MiMotionRunner:
         if app_token is None:
             return "登陆失败！", False
 
-        step, last_step = pick_incremental_step(self.user, min_step, max_step)
+        huami_steps = None
+        if self.user_id:
+            try:
+                huami_steps = zeppHelper.fetch_today_steps(app_token, self.user_id)
+                self.log_str += f"华米当天:{huami_steps}\n"
+            except Exception as err:
+                self.log_str += f"读取华米当天失败，回退仓库上次记录：{err}\n"
+        else:
+            self.log_str += "缺少 user_id，无法读华米当天，回退仓库上次记录\n"
+        baseline, source = resolve_baseline(self.user, huami_steps)
+        abs_max = get_int_value_default(config, 'MAX_STEP', 25000)
+        step, last_step = pick_incremental_step(min_step, max_step, baseline, abs_max)
         step = str(step)
         self.log_str += (
             f"已设置为递增范围({min_step}~{max_step}) "
-            f"上次:{last_step} 本次:{step}\n"
+            f"当前基准({source}):{last_step} 本次:{step}\n"
         )
         ok, msg = zeppHelper.post_fake_brand_data(step, app_token, self.user_id)
         if ok:
