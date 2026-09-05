@@ -8,6 +8,7 @@ import { hydrateStats, publicStats, recordGuest } from "./stats.js";
 
 export const TODAY_STEPS_CACHE_URL = "https://mimotion.internal/today-steps";
 export const TODAY_STEPS_TTL_SECONDS = 180;
+export const TODAY_STEPS_STALE_SECONDS = 1800;
 
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
@@ -178,7 +179,15 @@ function todayStepsPayload(date, steps) {
     date,
     steps: Number(steps) || 0,
     source: "huami",
+    fetched_at: Date.now(),
   };
+}
+
+function isFreshTodaySteps(body) {
+  if (!body || body.ok !== true) return false;
+  const t = Number(body.fetched_at);
+  if (!Number.isFinite(t) || t <= 0) return false;
+  return Date.now() - t < TODAY_STEPS_TTL_SECONDS * 1000;
 }
 
 async function matchTodayStepsCache(cache) {
@@ -200,7 +209,7 @@ async function putTodayStepsCache(cache, payload, ctx) {
     const persist = cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify(payload), {
       headers: {
         "content-type": "application/json; charset=utf-8",
-        "Cache-Control": `public, max-age=${TODAY_STEPS_TTL_SECONDS}`,
+        "Cache-Control": `public, max-age=${TODAY_STEPS_STALE_SECONDS}`,
       },
     }));
     if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(persist);
@@ -245,30 +254,39 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
   if (request.method === "GET" && path === "/today-steps") {
     const cache = resolveCache(ctx);
     const fresh = url.searchParams.get("fresh") === "1";
-    if (!fresh) {
-      const cached = await matchTodayStepsCache(cache);
-      if (cached) return json(cached, 200, origin, env);
+    const cached = await matchTodayStepsCache(cache);
+    if (!fresh && isFreshTodaySteps(cached)) {
+      return json(cached, 200, origin, env);
     }
     const { cfg, error } = await readOwnerConfig(env);
-    if (error) return json({ ok: false, error }, 503, origin, env);
+    if (error) {
+      if (cached) return json({ ...cached, stale: true, warning: error }, 200, origin, env);
+      return json({ ok: false, error }, 503, origin, env);
+    }
     if (!cfg) {
-      return json({
-        ok: false,
-        error: "今日步数还差 Worker 里的 CONFIG。把仓库那份 JSON 贴进去即可。",
-      }, 503, origin, env);
+      const missing = "今日步数还差 Worker 里的 CONFIG。把仓库那份 JSON 贴进去即可。";
+      if (cached) return json({ ...cached, stale: true, warning: missing }, 200, origin, env);
+      return json({ ok: false, error: missing }, 503, origin, env);
     }
     try {
       const account = cfg.accounts[0];
-      const result = await fetchTodaySteps({
+      const result = await withDeadline(fetchTodaySteps({
         user: account.user,
         password: account.password,
         now: new Date(),
         fetchImpl,
-      });
+      }), 15000);
       const payload = todayStepsPayload(result.date, result.steps);
       await putTodayStepsCache(cache, payload, ctx);
       return json(payload, 200, origin, env);
     } catch (err) {
+      if (cached) {
+        return json({
+          ...cached,
+          stale: true,
+          warning: String(err.message || err),
+        }, 200, origin, env);
+      }
       return json({
         ok: false,
         error: String(err.message || err),

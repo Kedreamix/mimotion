@@ -660,6 +660,33 @@ test("GET /today-steps reads Huami summary, caches, and honors fresh=1", async (
   assert.equal(fresh.body.steps, 999);
 });
 
+test("GET /today-steps keeps stale cache if Huami fails", async () => {
+  const cache = memoryCache();
+  await cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify({
+    ok: true,
+    date: todayBeijing(),
+    steps: 54188,
+    source: "huami",
+    fetched_at: Date.now() - 10 * 60 * 1000,
+  }), { headers: { "content-type": "application/json" } }));
+  const payload = await read(await handleRequest(
+    todayStepsRequest("?fresh=1"),
+    ownerEnv({ USER: "a@b.com", PWD: "zepp" }),
+    mockFetch([{
+      expectUrl: /api-user\.zepp\.com/,
+      expectMethod: "POST",
+      status: 500,
+      body: "boom",
+    }]),
+    { cache },
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.ok, true);
+  assert.equal(payload.body.steps, 54188);
+  assert.equal(payload.body.stale, true);
+  assert.match(String(payload.body.warning), /500/);
+});
+
 test("GET /today-steps stays on the CN upload host even if login maps another region", async () => {
   const payload = await read(await handleRequest(
     todayStepsRequest(),

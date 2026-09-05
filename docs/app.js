@@ -79,13 +79,22 @@
       $("last-step").textContent = Number(today.steps).toLocaleString("zh-CN");
       setBar(Number(today.steps));
       const when = today.date === todayBJ() ? "华米当天" : (today.date || "华米");
-      $("step-date").textContent = `${when} · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+      $("step-date").textContent = today.stale
+        ? `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`
+        : `${when} · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
       return;
     }
-    if (lastHuami) return;
+    if (lastHuami) {
+      $("step-date").textContent = today && today.error
+        ? `华米暂时读不到：${today.error}`
+        : "华米暂时读不到，仍显示刚才的数";
+      return;
+    }
     $("last-step").textContent = "—";
     setBar(0);
-    $("step-date").textContent = "暂无华米当天数据";
+    $("step-date").textContent = today && today.error
+      ? `读不到：${today.error}`
+      : "暂无华米当天数据";
   }
 
   function applyCronLast(cron) {
@@ -105,16 +114,24 @@
 
   async function loadTodaySteps(fresh) {
     const url = guestEndpoint(fresh ? "/today-steps?fresh=1" : "/today-steps");
-    if (!url) return null;
+    if (!url) return { error: "刷步接口暂不可用" };
     try {
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store", mode: "cors" });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.ok) return null;
+      if (!res.ok || !body.ok) {
+        return { error: body.error || `读取失败（${res.status}）` };
+      }
       const steps = Number(body.steps);
-      if (!Number.isFinite(steps)) return null;
-      return { date: body.date || "", steps, source: body.source || "huami" };
+      if (!Number.isFinite(steps)) return { error: "华米当天步数无法解析" };
+      return {
+        date: body.date || "",
+        steps,
+        source: body.source || "huami",
+        stale: Boolean(body.stale),
+        warning: body.warning || "",
+      };
     } catch {
-      return null;
+      return { error: "刷步接口暂时连不上" };
     }
   }
 
