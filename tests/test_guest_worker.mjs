@@ -736,7 +736,11 @@ test("GET /today-steps CORS matches other public GET routes", async () => {
 function memoryD1() {
   const rows = [];
   let nextId = 1;
+  let todaySteps = null;
   function query(sql, args) {
+    if (/owner_today_steps/i.test(sql)) {
+      return todaySteps ? [todaySteps] : [];
+    }
     const kind = args[0] || "guest";
     const filtered = rows.filter((row) => row.kind === kind);
     if (/COUNT\(DISTINCT/i.test(sql) || /unique_users/i.test(sql)) {
@@ -757,12 +761,18 @@ function memoryD1() {
   }
   return {
     rows,
+    get todaySteps() {
+      return todaySteps;
+    },
     async exec() {
       return { count: 2 };
     },
     prepare(sql) {
       const execRun = async (...args) => {
-        if (/INSERT\s+INTO\s+guest_runs/i.test(sql)) {
+        if (/INSERT\s+INTO\s+owner_today_steps/i.test(sql)) {
+          const [date, steps, fetched_at, source] = args;
+          todaySteps = { id: 1, date, steps, fetched_at, source };
+        } else if (/INSERT\s+INTO\s+guest_runs/i.test(sql)) {
           const [created_at, user, ok, step, stage, error, elapsed_ms, kind] = args;
           rows.push({
             id: nextId++,
@@ -801,6 +811,25 @@ function memoryD1() {
           return query(sql, [])[0] || null;
         },
       };
+    },
+  };
+}
+
+function memoryCache() {
+  const store = new Map();
+  return {
+    async match(request) {
+      const key = String(request && request.url ? request.url : request);
+      const hit = store.get(key);
+      if (!hit) return null;
+      return new Response(hit.body, { headers: hit.headers });
+    },
+    async put(request, response) {
+      const key = String(request && request.url ? request.url : request);
+      store.set(key, {
+        body: await response.clone().text(),
+        headers: Object.fromEntries(response.headers.entries()),
+      });
     },
   };
 }
@@ -904,6 +933,9 @@ test("ensureSchema prepares one-line CREATE TABLE and never calls exec", async (
   await ensureSchema(db);
   assert.equal(calls.some((item) => item[0] === "exec"), false);
   assert.ok(calls.some((item) => item[0] === "prepare" && item[1].startsWith("CREATE TABLE IF NOT EXISTS guest_runs (id INTEGER")));
+  assert.ok(calls.some((item) => item[0] === "prepare" && item[1].startsWith("CREATE TABLE IF NOT EXISTS owner_today_steps")));
+  assert.ok(calls.some((item) => item[0] === "prepare" && /idx_guest_runs_kind/.test(item[1])));
+  assert.ok(calls.some((item) => item[0] === "prepare" && /idx_guest_runs_created/.test(item[1])));
   assert.equal(calls.every((item) => !String(item[1]).includes("\n")), true);
 });
 
@@ -1171,4 +1203,91 @@ test("owner-run records kind=owner without Zepp password or owner password", asy
   assert.equal(JSON.stringify(db.rows[0]).includes("zepp-secret"), false);
   assert.equal(JSON.stringify(db.rows[0]).includes("secret"), false);
   assert.equal(ae.points[0].indexes[0], "owner");
+});
+
+function lastStepsRequest() {
+  return new Request("https://guest.test/last-steps", {
+    headers: { Origin: "https://kedreamix.github.io" },
+  });
+}
+
+function refuseHuami() {
+  return () => {
+    throw new Error("should not hit Huami");
+  };
+}
+
+test("GET /last-steps is empty when nothing was recorded", async () => {
+  const res = await handleRequest(lastStepsRequest(), {
+    ALLOWED_ORIGINS: "https://kedreamix.github.io",
+    DB: memoryD1(),
+  }, refuseHuami());
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
+  const payload = await read(res);
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.ok, true);
+  assert.equal(payload.body.recorded, false);
+  assert.equal(payload.body.steps, undefined);
+});
+
+test("GET /today-steps saves last-steps; later live fetch still hits Huami", async () => {
+  const db = memoryD1();
+  const env = ownerEnv({ USER: "a@b.com", PWD: "zepp-secret", DB: db });
+  const firstRes = await handleRequest(todayStepsRequest(), env, mockFetch(huamiReadPlan(54188)));
+  assert.equal(firstRes.headers.get("Cache-Control"), "no-store");
+  const first = await read(firstRes);
+  assert.equal(first.status, 200);
+  assert.equal(first.body.steps, 54188);
+  assert.equal(first.body.source, "huami");
+
+  const recordedRes = await handleRequest(lastStepsRequest(), env, refuseHuami());
+  assert.equal(recordedRes.headers.get("Cache-Control"), "no-store");
+  const recorded = await read(recordedRes);
+  assert.equal(recorded.status, 200);
+  assert.equal(recorded.body.ok, true);
+  assert.equal(recorded.body.recorded, true);
+  assert.equal(recorded.body.steps, 54188);
+  assert.equal(recorded.body.date, todayBeijing());
+  assert.equal(recorded.body.source, "huami");
+  assert.equal(typeof recorded.body.fetched_at, "number");
+  assert.equal(JSON.stringify(recorded.body).includes("zepp-secret"), false);
+
+  const second = await read(await handleRequest(
+    todayStepsRequest(),
+    env,
+    mockFetch(huamiReadPlan(999)),
+  ));
+  assert.equal(second.status, 200);
+  assert.equal(second.body.steps, 999);
+
+  const after = await read(await handleRequest(lastStepsRequest(), env, refuseHuami()));
+  assert.equal(after.body.recorded, true);
+  assert.equal(after.body.steps, 999);
+});
+
+test("GET /last-steps can read Cache when D1 is missing", async () => {
+  const cache = memoryCache();
+  const env = ownerEnv({ USER: "a@b.com", PWD: "zepp-secret" });
+  await handleRequest(todayStepsRequest(), env, mockFetch(huamiReadPlan(321)), { cache });
+  const recorded = await read(await handleRequest(lastStepsRequest(), env, refuseHuami(), { cache }));
+  assert.equal(recorded.status, 200);
+  assert.equal(recorded.body.recorded, true);
+  assert.equal(recorded.body.steps, 321);
+});
+
+test("owner-run updates last-steps with today's uploaded count", async () => {
+  const db = memoryD1();
+  const env = ownerEnv({ USER: "a@b.com", PWD: "zepp-secret", DB: db });
+  const payload = await read(await handleRequest(
+    ownerRequest({ password: "secret", step: 12000 }, "owner-last-steps"),
+    env,
+    guestSuccessFetch(),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.step, 12000);
+  const recorded = await read(await handleRequest(lastStepsRequest(), env, refuseHuami()));
+  assert.equal(recorded.body.recorded, true);
+  assert.equal(recorded.body.steps, 12000);
+  assert.equal(recorded.body.date, todayBeijing());
+  assert.equal(recorded.body.source, "huami");
 });

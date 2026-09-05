@@ -139,17 +139,32 @@
     });
   }
 
-  function applyHuamiSteps(today) {
-    const live = today && Number.isFinite(Number(today.steps))
+  function restoreLocalHuami() {
+    const local = readLocalSteps();
+    if (!local || local.source !== "huami" || local.date !== todayBJ()) return;
+    const localAt = Number(local.fetched_at) || 0;
+    const currentAt = Number(lastHuami && lastHuami.fetched_at) || 0;
+    if (lastHuami && lastHuami.date === todayBJ() && currentAt >= localAt) return;
+    lastHuami = local;
+    paintSteps(local.steps);
+    $("step-date").textContent = "华米当前 · 上次刷新记下的 · 点刷新再问";
+  }
+
+  function applyHuamiSteps(today, { live = false } = {}) {
+    const usable = today && Number.isFinite(Number(today.steps))
       && today.source !== "repo" && today.source !== "local";
-    if (live) {
+    if (usable) {
       lastHuami = today;
       paintSteps(today.steps);
       writeLocalSteps({ ...today, source: today.source || "huami" });
       const when = today.date === todayBJ() ? "华米当前" : (today.date || "华米");
-      $("step-date").textContent = today.stale
-        ? `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`
-        : `${when} · 刚刷新 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+      if (today.stale) {
+        $("step-date").textContent = `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+      } else if (live) {
+        $("step-date").textContent = `${when} · 刚刷新 · 已记下`;
+      } else {
+        $("step-date").textContent = `${when} · 上次刷新记下的 · 点刷新再问`;
+      }
       return;
     }
     const picked = schedule.pickTodayDisplay({
@@ -220,6 +235,26 @@
       };
     } catch {
       return { error: "刷步接口暂时连不上" };
+    }
+  }
+
+  async function loadLastSteps() {
+    const url = guestEndpoint("/last-steps");
+    if (!url) return null;
+    try {
+      const res = await fetch(url, { cache: "no-store", mode: "cors" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.ok || !body.recorded) return null;
+      const steps = Number(body.steps);
+      if (!Number.isFinite(steps)) return null;
+      return {
+        date: body.date || "",
+        steps,
+        source: body.source || "huami",
+        fetched_at: Number(body.fetched_at) || 0,
+      };
+    } catch {
+      return null;
     }
   }
 
@@ -365,6 +400,7 @@
   async function loadDashboard({ queryHuami = false } = {}) {
     $("refresh").disabled = true;
     try {
+      restoreLocalHuami();
       const snapshot = await loadSnapshot();
       if (snapshot && snapshot.params) applyParams(snapshot.params);
       applyRepoSteps(cronFromData(snapshot));
@@ -381,7 +417,15 @@
       renderStatus(cron, data.runs || []);
       if (queryHuami) {
         $("step-date").textContent = "正在向华米读取当前步数…";
-        applyHuamiSteps(await loadTodaySteps());
+        applyHuamiSteps(await loadTodaySteps(), { live: true });
+      } else {
+        const recorded = await loadLastSteps();
+        if (recorded && recorded.date === todayBJ()) {
+          const localAt = Number(lastHuami && lastHuami.fetched_at) || 0;
+          if (!lastHuami || lastHuami.date !== todayBJ() || recorded.fetched_at >= localAt) {
+            applyHuamiSteps(recorded);
+          }
+        }
       }
       if (usedSnapshot) {
         $("status-detail").textContent = "实时接口暂不可用，正在显示快照";
@@ -442,7 +486,7 @@
           steps: Number(body.step),
           source: "huami",
           fetched_at: Date.now(),
-        });
+        }, { live: true });
       }
     } catch (err) {
       $("owner-pwd").value = "";

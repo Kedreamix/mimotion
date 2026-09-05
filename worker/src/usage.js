@@ -9,6 +9,7 @@ export function hasAnalytics(env = {}) {
 const CREATE_TABLE = "CREATE TABLE IF NOT EXISTS guest_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, user TEXT NOT NULL, ok INTEGER NOT NULL, step INTEGER, stage TEXT, error TEXT, elapsed_ms INTEGER, kind TEXT NOT NULL DEFAULT 'guest')";
 const CREATE_KIND_INDEX = "CREATE INDEX IF NOT EXISTS idx_guest_runs_kind ON guest_runs(kind)";
 const CREATE_CREATED_INDEX = "CREATE INDEX IF NOT EXISTS idx_guest_runs_created ON guest_runs(created_at)";
+export const CREATE_TODAY_STEPS = "CREATE TABLE IF NOT EXISTS owner_today_steps (id INTEGER PRIMARY KEY, date TEXT NOT NULL, steps INTEGER NOT NULL, fetched_at INTEGER NOT NULL, source TEXT NOT NULL)";
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -59,6 +60,7 @@ export async function ensureSchema(db) {
   await runSql(db, CREATE_TABLE);
   await runSql(db, CREATE_KIND_INDEX);
   await runSql(db, CREATE_CREATED_INDEX);
+  await runSql(db, CREATE_TODAY_STEPS);
 }
 
 async function insertUsage(db, row) {

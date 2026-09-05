@@ -3,8 +3,9 @@ import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
 import { hasAnalytics, hasD1, readUsage, recordUsage } from "./usage.js";
-import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime } from "./zepp.js";
+import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, todayBeijing } from "./zepp.js";
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
+import { readLastSteps, saveLastSteps } from "./today-steps-store.js";
 
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
@@ -212,13 +213,14 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         now: new Date(),
         fetchImpl,
       }), 15000);
-      return json({
-        ok: true,
+      const payload = {
         date: result.date,
         steps: Number(result.steps) || 0,
         source: "huami",
         fetched_at: Date.now(),
-      }, 200, origin, env, noStore);
+      };
+      await saveLastSteps(env, payload, ctx);
+      return json({ ok: true, ...payload }, 200, origin, env, noStore);
     } catch (err) {
       return json({
         ok: false,
@@ -226,6 +228,21 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         stage: err.stage || "today-steps",
       }, 400, origin, env, noStore);
     }
+  }
+  if (request.method === "GET" && path === "/last-steps") {
+    const noStore = { "Cache-Control": "no-store" };
+    const record = await readLastSteps(env, ctx);
+    if (!record) {
+      return json({ ok: true, recorded: false }, 200, origin, env, noStore);
+    }
+    return json({
+      ok: true,
+      recorded: true,
+      date: record.date,
+      steps: record.steps,
+      fetched_at: record.fetched_at,
+      source: record.source,
+    }, 200, origin, env, noStore);
   }
   if (request.method === "GET" && path === "/oauth/config") {
     return json({
@@ -347,6 +364,12 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         elapsed_ms: last.elapsed_ms,
         kind: "owner",
       });
+      await saveLastSteps(env, {
+        date: todayBeijing(now),
+        steps: last.step,
+        fetched_at: Date.now(),
+        source: "huami",
+      }, ctx);
     } else {
       const receivedUser = maskUser(normalizeUser(body.user));
       const passwordLen = String(body.password || "").trim().length;
