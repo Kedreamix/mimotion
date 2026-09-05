@@ -3,6 +3,8 @@
   const DEFAULT_STEP_GOAL = 25000;
   let stepGoal = DEFAULT_STEP_GOAL;
   let lastHuami = null;
+  let lastRepo = null;
+  const LOCAL_STEPS_KEY = "mimo-today-steps";
   const schedule = window.MimoSchedule;
 
   const $ = (id) => document.getElementById(id);
@@ -73,28 +75,113 @@
     return `${endpoint.replace(/\/$/, "")}${path}`;
   }
 
+  function readLocalSteps() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LOCAL_STEPS_KEY) || "null");
+      const steps = Number(raw && raw.steps);
+      if (!raw || !Number.isFinite(steps)) return null;
+      return {
+        date: raw.date || "",
+        steps,
+        source: raw.source || "local",
+        fetched_at: Number(raw.fetched_at) || 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function writeLocalSteps(today) {
+    if (!today || !Number.isFinite(Number(today.steps))) return;
+    const prev = readLocalSteps();
+    if (prev && prev.date === today.date && prev.source === "huami" && today.source && today.source !== "huami") {
+      return;
+    }
+    try {
+      localStorage.setItem(LOCAL_STEPS_KEY, JSON.stringify({
+        date: today.date || todayBJ(),
+        steps: Number(today.steps),
+        source: today.source || "huami",
+        fetched_at: Number(today.fetched_at) || Date.now(),
+      }));
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+
+  function paintSteps(steps) {
+    $("last-step").textContent = Number(steps).toLocaleString("zh-CN");
+    setBar(Number(steps));
+  }
+
+  function cronFromData(data) {
+    const cron = schedule.parseCronFile((data && data.cronText) || "");
+    if (data && Number(data.lastStep) > 0) {
+      cron.lastStep = Number(data.lastStep);
+      cron.lastStepDate = data.lastStepDate || cron.lastStepDate;
+    }
+    return cron;
+  }
+
+  function applyRepoSteps(cron) {
+    if (cron && Number(cron.lastStep) > 0) lastRepo = cron;
+    const huamiIsToday = lastHuami && lastHuami.date === todayBJ();
+    if (huamiIsToday) return;
+    if (!lastRepo || !Number(lastRepo.lastStep)) return;
+    const date = lastRepo.lastStepDate || "";
+    const when = date === todayBJ() ? "今日定时上传" : (date || "仓库记录");
+    paintSteps(lastRepo.lastStep);
+    $("step-date").textContent = `${when} · 仓库记下的，不是实时 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+    writeLocalSteps({
+      date: date || todayBJ(),
+      steps: lastRepo.lastStep,
+      source: "repo",
+    });
+  }
+
   function applyHuamiSteps(today) {
-    if (today && Number.isFinite(Number(today.steps))) {
+    const live = today && Number.isFinite(Number(today.steps))
+      && today.source !== "repo" && today.source !== "local";
+    if (live) {
       lastHuami = today;
-      $("last-step").textContent = Number(today.steps).toLocaleString("zh-CN");
-      setBar(Number(today.steps));
+      paintSteps(today.steps);
+      writeLocalSteps({ ...today, source: today.source || "huami" });
       const when = today.date === todayBJ() ? "华米当天" : (today.date || "华米");
       $("step-date").textContent = today.stale
         ? `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`
         : `${when} · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
       return;
     }
-    if (lastHuami) {
+    const picked = schedule.pickTodayDisplay({
+      huami: lastHuami,
+      local: readLocalSteps(),
+      repo: lastRepo,
+    });
+    if (picked) {
+      paintSteps(picked.steps);
+      if (picked.source === "huami") {
+        $("step-date").textContent = today && today.error
+          ? `华米暂时读不到：${today.error}`
+          : "华米暂时读不到，仍显示刚才的数";
+        return;
+      }
+      if (picked.source === "local") {
+        $("step-date").textContent = today && today.error
+          ? `本地记下的 ${picked.date || ""} · ${today.error}`
+          : `本地记下的 ${picked.date || ""} · 华米暂时读不到`;
+        return;
+      }
+      const when = picked.date === todayBJ() ? "今日定时上传" : (picked.date || "仓库记录");
       $("step-date").textContent = today && today.error
-        ? `华米暂时读不到：${today.error}`
-        : "华米暂时读不到，仍显示刚才的数";
+        ? `${when} · ${today.error}`
+        : `${when} · 仓库记下的，不是实时 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
       return;
     }
     $("last-step").textContent = "—";
     setBar(0);
     $("step-date").textContent = today && today.error
       ? `读不到：${today.error}`
-      : "暂无华米当天数据";
+      : "暂无当天步数";
   }
 
   function applyCronLast(cron) {
@@ -287,6 +374,7 @@
     try {
       const snapshot = await loadSnapshot();
       if (snapshot && snapshot.params) applyParams(snapshot.params);
+      applyRepoSteps(cronFromData(snapshot));
       const todayPromise = loadTodaySteps(false).then((today) => {
         applyHuamiSteps(today);
         return today;
@@ -299,12 +387,13 @@
         if (!snapshot) throw err;
         usedSnapshot = true;
       }
-      const cron = schedule.parseCronFile(data.cronText || "");
+      const cron = cronFromData(data);
+      applyRepoSteps(cron);
       renderStatus(cron, data.runs || []);
       const today = await todayPromise;
       const runAt = latestSuccessAt(data.runs || []);
-      const fetched = Number(today && today.fetched_at) || Number(lastHuami && lastHuami.fetched_at) || 0;
-      if (runAt > fetched) {
+      const fetched = Number(today && today.fetched_at) || 0;
+      if (fetched && runAt > fetched) {
         applyHuamiSteps(await loadTodaySteps(true));
       }
       if (usedSnapshot) {
@@ -454,5 +543,8 @@
   }
 
   checkOwnerSetup();
+  const boot = readLocalSteps();
+  if (boot && boot.source === "huami") applyHuamiSteps(boot);
+  else if (boot) applyRepoSteps({ lastStep: boot.steps, lastStepDate: boot.date });
   refresh();
 })();
