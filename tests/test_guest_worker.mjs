@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
-import { handleRequest, TODAY_STEPS_CACHE_URL, pickTodayStepsFreshMs, TODAY_STEPS_TTL_MIN_SECONDS, TODAY_STEPS_TTL_MAX_SECONDS } from "../worker/src/index.js";
+import { handleRequest } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
 import { ensureSchema, hasAnalytics, hasD1, sanitizeError, usageRow } from "../worker/src/usage.js";
 import { resetStatsForTests } from "../worker/src/stats.js";
@@ -137,23 +137,6 @@ function mockFetch(plan) {
       status: item.status,
       headers: item.headers || { "content-type": "application/json" },
     });
-  };
-}
-
-function memoryCache() {
-  const store = new Map();
-  const keyOf = (req) => (typeof req === "string" ? req : req.url);
-  return {
-    async match(req) {
-      const hit = store.get(keyOf(req));
-      return hit ? hit.clone() : undefined;
-    },
-    async put(req, res) {
-      store.set(keyOf(req), res.clone());
-    },
-    async delete(req) {
-      return store.delete(keyOf(req));
-    },
   };
 }
 
@@ -625,79 +608,33 @@ test("GET /today-steps returns 503 without CONFIG", async () => {
   assert.equal(JSON.stringify(payload.body).includes("secret"), false);
 });
 
-test("GET /today-steps reads Huami summary, caches, and honors fresh=1", async () => {
-  const cache = memoryCache();
+test("GET /today-steps always reads Huami and does not cache", async () => {
   const env = ownerEnv({ USER: "a@b.com", PWD: "zepp-secret" });
-  const first = await read(await handleRequest(
+  const firstRes = await handleRequest(
     todayStepsRequest(),
     env,
     mockFetch(huamiReadPlan(54188)),
-    { cache },
-  ));
+  );
+  assert.equal(firstRes.headers.get("Cache-Control"), "no-store");
+  const first = await read(firstRes);
   assert.equal(first.status, 200);
   assert.equal(first.body.ok, true);
   assert.equal(first.body.steps, 54188);
   assert.equal(first.body.source, "huami");
   assert.equal(first.body.date, todayBeijing());
+  assert.equal(first.body.fresh_until, undefined);
   assert.equal(JSON.stringify(first.body).includes("zepp-secret"), false);
 
-  const cached = await read(await handleRequest(
+  const second = await read(await handleRequest(
     todayStepsRequest(),
-    env,
-    mockFetch([]),
-    { cache },
-  ));
-  assert.equal(cached.status, 200);
-  assert.equal(cached.body.steps, 54188);
-
-  const fresh = await read(await handleRequest(
-    todayStepsRequest("?fresh=1"),
     env,
     mockFetch(huamiReadPlan(999)),
-    { cache },
   ));
-  assert.equal(fresh.status, 200);
-  assert.equal(fresh.body.steps, 999);
+  assert.equal(second.status, 200);
+  assert.equal(second.body.steps, 999);
 });
 
-test("today-steps fresh window is a random 5 to 10 minutes", () => {
-  const now = 1_000_000;
-  const minUntil = pickTodayStepsFreshMs(now, () => 0);
-  const maxUntil = pickTodayStepsFreshMs(now, () => 0.999999);
-  assert.equal(minUntil, now + TODAY_STEPS_TTL_MIN_SECONDS * 1000);
-  assert.equal(maxUntil, now + TODAY_STEPS_TTL_MAX_SECONDS * 1000);
-});
-
-test("GET /today-steps refetches Huami after the jittered fresh window", async () => {
-  const cache = memoryCache();
-  await cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify({
-    ok: true,
-    date: todayBeijing(),
-    steps: 111,
-    source: "huami",
-    fetched_at: Date.now() - 12 * 60 * 1000,
-    fresh_until: Date.now() - 1000,
-  }), { headers: { "content-type": "application/json" } }));
-  const payload = await read(await handleRequest(
-    todayStepsRequest(),
-    ownerEnv({ USER: "a@b.com", PWD: "zepp" }),
-    mockFetch(huamiReadPlan(222)),
-    { cache },
-  ));
-  assert.equal(payload.status, 200);
-  assert.equal(payload.body.steps, 222);
-  assert.ok(Number(payload.body.fresh_until) > Date.now());
-});
-
-test("GET /today-steps keeps stale cache if Huami fails", async () => {
-  const cache = memoryCache();
-  await cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify({
-    ok: true,
-    date: todayBeijing(),
-    steps: 54188,
-    source: "huami",
-    fetched_at: Date.now() - 10 * 60 * 1000,
-  }), { headers: { "content-type": "application/json" } }));
+test("GET /today-steps fails instead of serving a cached number", async () => {
   const payload = await read(await handleRequest(
     todayStepsRequest("?fresh=1"),
     ownerEnv({ USER: "a@b.com", PWD: "zepp" }),
@@ -707,13 +644,10 @@ test("GET /today-steps keeps stale cache if Huami fails", async () => {
       status: 500,
       body: "boom",
     }]),
-    { cache },
   ));
-  assert.equal(payload.status, 200);
-  assert.equal(payload.body.ok, true);
-  assert.equal(payload.body.steps, 54188);
-  assert.equal(payload.body.stale, true);
-  assert.match(String(payload.body.warning), /500/);
+  assert.equal(payload.status, 400);
+  assert.equal(payload.body.ok, false);
+  assert.match(String(payload.body.error), /500/);
 });
 
 test("GET /today-steps stays on the CN upload host even if login maps another region", async () => {
@@ -797,52 +731,6 @@ test("GET /today-steps CORS matches other public GET routes", async () => {
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://kedreamix.github.io");
   const payload = await read(res);
   assert.equal(payload.body.steps, 12);
-});
-
-test("owner-run updates today-steps cache", async () => {
-  const cache = memoryCache();
-  await cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify({
-    ok: true,
-    date: todayBeijing(),
-    steps: 100,
-    source: "huami",
-  }), {
-    headers: { "content-type": "application/json", "Cache-Control": "public, max-age=180" },
-  }));
-  const fetchImpl = mockFetch([
-    {
-      expectUrl: /api-user\.zepp\.com/,
-      expectMethod: "POST",
-      status: 303,
-      headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
-    },
-    {
-      expectUrl: /account\.huami\.com/,
-      expectMethod: "POST",
-      status: 200,
-      body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "a", user_id: "u1" } }),
-    },
-    {
-      expectUrl: /band_data\.json/,
-      expectMethod: "POST",
-      status: 200,
-      body: JSON.stringify({ message: "success" }),
-    },
-  ]);
-  const res = await handleRequest(
-    ownerRequest({ password: "secret", step: 12000 }, "ip-owner-cache"),
-    ownerEnv({ USER: "13800138000", PWD: "zepp-secret" }),
-    fetchImpl,
-    { cache },
-  );
-  const payload = await read(res);
-  assert.equal(payload.status, 200);
-  const hit = await cache.match(TODAY_STEPS_CACHE_URL);
-  const cached = JSON.parse(await hit.text());
-  assert.equal(cached.ok, true);
-  assert.equal(cached.steps, 12000);
-  assert.equal(cached.source, "huami");
-  assert.equal(cached.date, todayBeijing());
 });
 
 function memoryD1() {

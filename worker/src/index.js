@@ -3,19 +3,8 @@ import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
 import { hasAnalytics, hasD1, readUsage, recordUsage } from "./usage.js";
-import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, todayBeijing } from "./zepp.js";
+import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime } from "./zepp.js";
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
-
-export const TODAY_STEPS_CACHE_URL = "https://mimotion.internal/today-steps";
-export const TODAY_STEPS_TTL_MIN_SECONDS = 300;
-export const TODAY_STEPS_TTL_MAX_SECONDS = 600;
-export const TODAY_STEPS_STALE_SECONDS = 7200;
-
-export function pickTodayStepsFreshMs(now = Date.now(), random = Math.random) {
-  const span = TODAY_STEPS_TTL_MAX_SECONDS - TODAY_STEPS_TTL_MIN_SECONDS;
-  const seconds = TODAY_STEPS_TTL_MIN_SECONDS + Math.floor(random() * (span + 1));
-  return now + seconds * 1000;
-}
 
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
@@ -57,12 +46,13 @@ function corsHeaders(origin, env) {
   };
 }
 
-function json(data, status, origin, env) {
+function json(data, status, origin, env, extra = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       ...corsHeaders(origin, env),
+      ...extra,
     },
   });
 }
@@ -170,66 +160,6 @@ async function handleOwnerUsage(request, env, origin) {
   }
 }
 
-function resolveCache(ctx) {
-  if (ctx && ctx.cache) return ctx.cache;
-  if (typeof caches === "undefined") return null;
-  try {
-    return caches.default;
-  } catch {
-    return null;
-  }
-}
-
-function todayStepsPayload(date, steps) {
-  const fetchedAt = Date.now();
-  return {
-    ok: true,
-    date,
-    steps: Number(steps) || 0,
-    source: "huami",
-    fetched_at: fetchedAt,
-    fresh_until: pickTodayStepsFreshMs(fetchedAt),
-  };
-}
-
-function isFreshTodaySteps(body) {
-  if (!body || body.ok !== true) return false;
-  const until = Number(body.fresh_until);
-  if (Number.isFinite(until) && until > 0) return Date.now() < until;
-  const t = Number(body.fetched_at);
-  if (!Number.isFinite(t) || t <= 0) return false;
-  return Date.now() - t < TODAY_STEPS_TTL_MIN_SECONDS * 1000;
-}
-
-async function matchTodayStepsCache(cache) {
-  if (!cache) return null;
-  try {
-    const hit = await cache.match(TODAY_STEPS_CACHE_URL);
-    if (!hit) return null;
-    const body = await hit.json();
-    if (!body || body.ok !== true) return null;
-    return body;
-  } catch {
-    return null;
-  }
-}
-
-async function putTodayStepsCache(cache, payload, ctx) {
-  if (!cache) return;
-  try {
-    const persist = cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify(payload), {
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-        "Cache-Control": `public, max-age=${TODAY_STEPS_STALE_SECONDS}`,
-      },
-    }));
-    if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(persist);
-    else await persist;
-  } catch {
-    /* Cache API 不可用时忽略 */
-  }
-}
-
 async function readOwnerConfig(env) {
   try {
     return { cfg: parseOwnerAccounts(env), error: null };
@@ -263,21 +193,16 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
     return handleOwnerUsage(request, env, origin);
   }
   if (request.method === "GET" && path === "/today-steps") {
-    const cache = resolveCache(ctx);
-    const fresh = url.searchParams.get("fresh") === "1";
-    const cached = await matchTodayStepsCache(cache);
-    if (!fresh && isFreshTodaySteps(cached)) {
-      return json(cached, 200, origin, env);
-    }
+    const noStore = { "Cache-Control": "no-store" };
     const { cfg, error } = await readOwnerConfig(env);
     if (error) {
-      if (cached) return json({ ...cached, stale: true, warning: error }, 200, origin, env);
-      return json({ ok: false, error }, 503, origin, env);
+      return json({ ok: false, error }, 503, origin, env, noStore);
     }
     if (!cfg) {
-      const missing = "今日步数还差 Worker 里的 CONFIG。把仓库那份 JSON 贴进去即可。";
-      if (cached) return json({ ...cached, stale: true, warning: missing }, 200, origin, env);
-      return json({ ok: false, error: missing }, 503, origin, env);
+      return json({
+        ok: false,
+        error: "今日步数还差 Worker 里的 CONFIG。把仓库那份 JSON 贴进去即可。",
+      }, 503, origin, env, noStore);
     }
     try {
       const account = cfg.accounts[0];
@@ -287,22 +212,19 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         now: new Date(),
         fetchImpl,
       }), 15000);
-      const payload = todayStepsPayload(result.date, result.steps);
-      await putTodayStepsCache(cache, payload, ctx);
-      return json(payload, 200, origin, env);
+      return json({
+        ok: true,
+        date: result.date,
+        steps: Number(result.steps) || 0,
+        source: "huami",
+        fetched_at: Date.now(),
+      }, 200, origin, env, noStore);
     } catch (err) {
-      if (cached) {
-        return json({
-          ...cached,
-          stale: true,
-          warning: String(err.message || err),
-        }, 200, origin, env);
-      }
       return json({
         ok: false,
         error: String(err.message || err),
         stage: err.stage || "today-steps",
-      }, 400, origin, env);
+      }, 400, origin, env, noStore);
     }
   }
   if (request.method === "GET" && path === "/oauth/config") {
@@ -416,7 +338,6 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
           ? `已为 ${last.user} 同步 ${last.step} 步`
           : `已为 ${results.length} 个账号同步，最近 ${last.step} 步`,
       };
-      await putTodayStepsCache(resolveCache(ctx), todayStepsPayload(todayBeijing(now), last.step), ctx);
       await recordUsage(ctx, env, {
         user: last.user,
         password: body.password,
