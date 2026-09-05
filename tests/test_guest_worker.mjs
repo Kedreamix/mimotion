@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { encryptHuami } from "../worker/src/aes.js";
-import { handleRequest, TODAY_STEPS_CACHE_URL } from "../worker/src/index.js";
+import { handleRequest, TODAY_STEPS_CACHE_URL, pickTodayStepsFreshMs, TODAY_STEPS_TTL_MIN_SECONDS, TODAY_STEPS_TTL_MAX_SECONDS } from "../worker/src/index.js";
 import { safeEqual } from "../worker/src/secret.js";
 import { ensureSchema, hasAnalytics, hasD1, sanitizeError, usageRow } from "../worker/src/usage.js";
 import { resetStatsForTests } from "../worker/src/stats.js";
@@ -658,6 +658,35 @@ test("GET /today-steps reads Huami summary, caches, and honors fresh=1", async (
   ));
   assert.equal(fresh.status, 200);
   assert.equal(fresh.body.steps, 999);
+});
+
+test("today-steps fresh window is a random 5 to 10 minutes", () => {
+  const now = 1_000_000;
+  const minUntil = pickTodayStepsFreshMs(now, () => 0);
+  const maxUntil = pickTodayStepsFreshMs(now, () => 0.999999);
+  assert.equal(minUntil, now + TODAY_STEPS_TTL_MIN_SECONDS * 1000);
+  assert.equal(maxUntil, now + TODAY_STEPS_TTL_MAX_SECONDS * 1000);
+});
+
+test("GET /today-steps refetches Huami after the jittered fresh window", async () => {
+  const cache = memoryCache();
+  await cache.put(TODAY_STEPS_CACHE_URL, new Response(JSON.stringify({
+    ok: true,
+    date: todayBeijing(),
+    steps: 111,
+    source: "huami",
+    fetched_at: Date.now() - 12 * 60 * 1000,
+    fresh_until: Date.now() - 1000,
+  }), { headers: { "content-type": "application/json" } }));
+  const payload = await read(await handleRequest(
+    todayStepsRequest(),
+    ownerEnv({ USER: "a@b.com", PWD: "zepp" }),
+    mockFetch(huamiReadPlan(222)),
+    { cache },
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.steps, 222);
+  assert.ok(Number(payload.body.fresh_until) > Date.now());
 });
 
 test("GET /today-steps keeps stale cache if Huami fails", async () => {
