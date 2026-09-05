@@ -34,6 +34,8 @@
     });
   }
 
+  const RING = 2 * Math.PI * 58;
+
   function setStep(value, fromRandom) {
     const n = Math.max(1, Math.min(98800, Math.floor(Number(value) || 1)));
     $("step").value = String(n);
@@ -42,6 +44,11 @@
     $("distance").textContent = describe(n);
     $("mood").textContent = mood(n);
     $("pass-no").textContent = `目标 ${format(n)}`;
+    const ring = $("ring");
+    if (ring) {
+      ring.style.strokeDasharray = String(RING);
+      ring.style.strokeDashoffset = String(RING * (1 - n / 98800));
+    }
     const bar = $("bar-value");
     if (bar) bar.style.width = `${Math.round((n / 98800) * 100)}%`;
     markChip(n, fromRandom);
