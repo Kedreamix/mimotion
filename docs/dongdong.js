@@ -1,5 +1,4 @@
 (() => {
-  const RING = 2 * Math.PI * 58;
   const $ = (id) => document.getElementById(id);
   const PRESETS = [3000, 6666, 8000, 8888, 9999, 12000, 20000, 30000];
 
@@ -42,10 +41,9 @@
     $("step-display").textContent = format(n);
     $("distance").textContent = describe(n);
     $("mood").textContent = mood(n);
-    $("pass-no").textContent = `#${n}`;
-    const ring = $("ring");
-    ring.style.strokeDasharray = String(RING);
-    ring.style.strokeDashoffset = String(RING * (1 - n / 98800));
+    $("pass-no").textContent = `目标 ${format(n)}`;
+    const bar = $("bar-value");
+    if (bar) bar.style.width = `${Math.round((n / 98800) * 100)}%`;
     markChip(n, fromRandom);
     return n;
   }
@@ -74,11 +72,11 @@
     $("form").hidden = false;
     const el = $("result");
     el.hidden = false;
-    el.className = "result " + kind;
+    el.className = "banner " + (kind === "wait" ? "wait" : kind === "maybe" ? "ok" : "bad");
     $("result-title").textContent = title;
     $("result-detail").textContent = detail || "";
-    document.querySelector(".watch").classList.toggle("done", false);
-    document.querySelector(".pass").classList.remove("arrived");
+    $("status-card").classList.remove("ok");
+    $("pass").classList.remove("arrived");
     el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -125,9 +123,8 @@
     $("receipt-time").textContent = `${beijingStamp()} · 北京时间`;
     $("receipt-trace").textContent = formatTrace(trace, elapsed_ms) || "";
     $("mood").textContent = "到了";
-    document.querySelector(".watch").classList.add("done");
-    document.querySelector(".pass").classList.add("arrived");
-    document.querySelector(".stub span:first-child").textContent = "已盖章";
+    $("status-card").classList.add("ok");
+    $("pass").classList.add("arrived");
     $("receipt").scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -138,9 +135,8 @@
     $("password").value = "";
     $("password").focus();
     $("mood").textContent = mood(Number($("step").value));
-    document.querySelector(".watch").classList.remove("done");
-    document.querySelector(".pass").classList.remove("arrived");
-    document.querySelector(".stub span:first-child").textContent = "今日通行条";
+    $("status-card").classList.remove("ok");
+    $("pass").classList.remove("arrived");
   });
 
   function renderStats(body) {
@@ -149,37 +145,32 @@
     if ($("stat-sla")) $("stat-sla").textContent = "≤2s";
   }
 
-  async function ping() {
+  function setLive(ok, label) {
     const live = $("api-live");
+    live.classList.toggle("off", !ok);
+    live.innerHTML = `<i></i> ${label}`;
+  }
+
+  async function ping() {
     const endpoint = window.MIMO_GUEST_API;
     if (!endpoint) {
-      live.textContent = "离线";
-      live.classList.add("off");
+      setLive(false, "离线");
       return;
     }
     try {
-      const res = await fetch(`${endpoint.replace(/\/$/, "")}/health`, { cache: "no-store" });
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/health`, {
+        mode: "cors",
+        cache: "no-store",
+      });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) throw new Error();
-      live.textContent = "在线";
-      live.classList.remove("off");
+      setLive(true, "在线");
       renderStats(body);
     } catch {
-      live.textContent = "离线";
-      live.classList.add("off");
+      setLive(false, "离线");
     }
   }
   ping();
-
-  async function postGuest(endpoint, payload) {
-    const res = await fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json().catch(() => ({}));
-    return { res, body };
-  }
 
   function isDropped(err) {
     const msg = String(err && err.message || err).toLowerCase();
@@ -188,6 +179,26 @@
       || msg.includes("failed to fetch")
       || msg.includes("load failed")
       || msg.includes("networkerror");
+  }
+
+  async function postGuest(endpoint, payload) {
+    const run = () => fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      credentials: "omit",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    let res;
+    try {
+      res = await run();
+    } catch (err) {
+      if (!isDropped(err)) throw err;
+      res = await run();
+    }
+    const body = await res.json().catch(() => ({}));
+    return { res, body };
   }
 
   $("form").addEventListener("submit", async (event) => {

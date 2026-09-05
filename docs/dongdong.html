@@ -8,7 +8,8 @@
   <title>迈步 · mimotion 一次性刷步</title>
   <meta name="description" content="迈步：填自己的 Zepp Life 账号，指定步数，走一趟就结束。不定时、不入库。" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2307090d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff5a1f' stroke-width='6'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="./dongdong.css?v=5" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
+  <link rel="stylesheet" href="./dongdong.css?v=7" />
   <script>
     (function () {
       var p = localStorage.getItem("mimo-theme") || localStorage.getItem("mimo-dongdong-theme");
@@ -27,100 +28,100 @@
   </script>
 </head>
 <body>
-  <div class="glow" aria-hidden="true"></div>
+  <div class="bg"></div>
   <header class="top">
-    <a class="brand" href="./">
-      <span class="logo" aria-hidden="true"><img class="logo-mark" alt="" src="./assets/pikachu-mark.png" width="38" height="38" hidden /></span>
-      <span>
-        <strong>迈步</strong>
-        <small>mimotion 一次性刷步</small>
-      </span>
-    </a>
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><img class="logo-mark" alt="" src="./assets/pikachu-mark.png" width="42" height="42" hidden /></span>
+      <div>
+        <h1>迈步</h1>
+        <p>一次性刷步</p>
+      </div>
+    </div>
     <nav class="nav" aria-label="页面">
       <a href="./">看板</a>
       <a href="./dongdong.html" class="active">迈步</a>
       <a href="./settings.html">参数</a>
     </nav>
-    <div class="top-actions">
+    <div class="top-meta">
       <button id="theme-btn" type="button" title="跟随系统，点击改为浅色">系统</button>
     </div>
   </header>
 
-  <section class="metrics" aria-label="服务指标">
-    <div>
-      <small>API</small>
-      <strong id="api-ver">v1.0</strong>
-    </div>
-    <div>
-      <small>成功率</small>
-      <strong id="stat-rate">99.9%</strong>
-    </div>
-    <div>
-      <small>中位耗时</small>
-      <strong id="stat-sla">≤2s</strong>
-    </div>
-    <div>
-      <small>接口</small>
-      <strong id="api-live" class="live">检测中</strong>
-    </div>
-  </section>
-
-  <main class="play">
-    <section class="watch" aria-label="目标步数">
-      <p class="kicker">TODAY · 步数更新</p>
-      <h1>今天走几步？</h1>
-      <div class="dial" aria-hidden="true">
-        <svg viewBox="0 0 140 140">
-          <circle class="track" cx="70" cy="70" r="58" />
-          <circle id="ring" class="ring" cx="70" cy="70" r="58" />
-        </svg>
-        <div class="dial-core">
-          <strong id="step-display">20,000</strong>
-          <span>步</span>
-          <em id="mood">有点猛</em>
+  <main class="dashboard">
+    <section class="glance" id="status-card">
+      <div class="steps">
+        <div class="step-title">
+          <p class="kicker">TODAY · 今天走几步？</p>
+          <span class="live-pill" id="api-live"><i></i> 检测中</span>
+        </div>
+        <div class="step-number"><strong id="step-display">20,000</strong><span>步</span></div>
+        <div class="bar" aria-hidden="true"><i id="bar-value"></i></div>
+        <span class="muted" id="distance">大约 14.0 公里 · 操场 35 圈</span>
+        <p class="cron-last muted" id="mood">有点猛</p>
+        <input id="slider" type="range" min="1" max="98800" value="20000" aria-label="步数" />
+        <div class="chips" id="chips">
+          <button type="button" data-step="3000">3 千 · 赖床</button>
+          <button type="button" data-step="6666">6666 · 六六顺</button>
+          <button type="button" data-step="8000">8 千 · 溜达</button>
+          <button type="button" data-step="8888">8888 · 发发发</button>
+          <button type="button" data-step="9999">9999 · 长长久久</button>
+          <button type="button" data-step="12000">1.2 万 · 日常</button>
+          <button type="button" data-step="20000" class="on">2 万 · 暴走</button>
+          <button type="button" data-step="30000">3 万 · 疯走</button>
+          <button type="button" data-random="1">随机 · 随缘</button>
         </div>
       </div>
-      <p id="distance" class="distance">大约 14.0 公里 · 操场 35 圈</p>
-      <input id="slider" type="range" min="1" max="98800" value="20000" aria-label="步数" />
-      <div class="chips" id="chips">
-        <button type="button" data-step="3000">3 千 · 赖床</button>
-        <button type="button" data-step="6666">6666 · 六六顺</button>
-        <button type="button" data-step="8000">8 千 · 溜达</button>
-        <button type="button" data-step="8888">8888 · 发发发</button>
-        <button type="button" data-step="9999">9999 · 长长久久</button>
-        <button type="button" data-step="12000">1.2 万 · 日常</button>
-        <button type="button" data-step="20000" class="on">2 万 · 暴走</button>
-        <button type="button" data-step="30000">3 万 · 疯走</button>
-        <button type="button" data-random="1">随机 · 随缘</button>
-      </div>
+      <dl class="facts">
+        <div>
+          <dt>API</dt>
+          <dd id="api-ver">v1.0</dd>
+          <dd class="muted">接口版本</dd>
+        </div>
+        <div>
+          <dt>成功率</dt>
+          <dd id="stat-rate">99.9%</dd>
+          <dd class="muted">展示值</dd>
+        </div>
+        <div>
+          <dt>中位耗时</dt>
+          <dd id="stat-sla">≤2s</dd>
+          <dd class="muted" id="pass-no">目标 20,000</dd>
+        </div>
+      </dl>
     </section>
 
-    <section class="pass">
-      <div class="stub">
-        <span>今日通行条</span>
-        <span id="pass-no">#20000</span>
+    <section class="panel action-card" id="pass">
+      <div class="owner-intro">
+        <div class="owner-icon" aria-hidden="true">＋</div>
+        <div class="action-copy">
+          <div class="action-heading">
+            <p class="eyebrow">ONE SHOT</p>
+            <span class="auth-badge">自己的号</span>
+          </div>
+          <h2>走这一趟</h2>
+          <p class="muted">填自己的 Zepp Life 账号。走完就结束，不进仓库，不定闹钟。</p>
+        </div>
       </div>
-      <form id="form">
-        <p class="pass-lead">填自己的 Zepp Life 账号。走完这一趟就结束，不进仓库，不定闹钟。</p>
-        <label>Zepp Life 账号
+      <form id="form" class="maibu-form">
+        <label class="field"><span>Zepp Life 账号</span>
           <input id="user" name="zepp_user" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="手机号或邮箱" required />
         </label>
-        <label>密码
+        <label class="field"><span>密码</span>
           <input id="password" name="zepp_password" type="password" autocomplete="off" placeholder="请手打 Zepp Life 密码" required />
         </label>
-        <label>精确步数
+        <label class="field"><span>精确步数</span>
           <input id="step" type="number" min="1" max="98800" step="1" value="20000" required />
         </label>
-        <button id="submit" class="go" type="submit">走这一趟 <span>→</span></button>
+        <button id="submit" class="primary run-button" type="submit">走这一趟 <span>→</span></button>
       </form>
-      <div id="result" class="result" hidden aria-live="assertive">
+      <p id="result" class="banner" hidden aria-live="assertive">
         <strong id="result-title"></strong>
-        <p id="result-detail"></p>
-      </div>
+        <span id="result-detail"></span>
+      </p>
       <div id="receipt" class="receipt" hidden aria-live="assertive">
-        <p class="kicker">这一趟到了</p>
+        <p class="eyebrow">这一趟到了</p>
         <p class="receipt-step"><strong id="receipt-step">0</strong><span>步</span></p>
-        <dl>
+        <dl class="facts receipt-facts">
           <div>
             <dt>账号</dt>
             <dd id="receipt-user">—</dd>
@@ -135,54 +136,47 @@
           <li>看今天是不是这个步数</li>
           <li>支付宝 / 微信可能再过几分钟才跟上</li>
         </ol>
-        <p class="receipt-note">看板顶部的「今日步数」是定时账号，不会因为这一趟变。</p>
-        <p id="receipt-trace" class="receipt-trace"></p>
+        <p class="muted receipt-note">看板顶部的「今日步数」是定时账号，不会因为这一趟变。</p>
+        <p id="receipt-trace" class="muted receipt-trace"></p>
         <button id="again" type="button">再走一趟</button>
       </div>
-      <p class="hint">密码不会保存在页面。请只动自己的号。Zepp Life 账号，不是小米快捷登录。</p>
+      <p class="owner-meta"><span>密码不会保存在页面。请只动自己的号。Zepp Life 账号，不是小米快捷登录。</span></p>
+    </section>
+
+    <section class="panel slim schedule-card" id="about">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">ABOUT</p>
+          <h2>关于迈步</h2>
+        </div>
+        <p class="muted">和看板上「马上刷步」走同一条华米接口，只是用你自己的账号。</p>
+      </div>
+      <div class="guide-grid">
+        <article>
+          <h3>怎么走</h3>
+          <ol>
+            <li>输入注册 Zepp Life 时用的邮箱或手机号</li>
+            <li>用手打该账号的密码，不要用浏览器自动填充</li>
+            <li>点快捷档或「随机」，也可以自己填 1 – 98,800</li>
+            <li>点「走这一趟」。出现「这一趟到了」才算成功</li>
+          </ol>
+        </article>
+        <article>
+          <h3>注意</h3>
+          <ul>
+            <li>仅供学习、测试，请只动自己的号</li>
+            <li>要用 Zepp Life 密码，不是小米快捷登录，也不是看板站长密码</li>
+            <li>同一网络请别连点，接口有短时限流</li>
+            <li>密码不对大约 1–2 秒就会返回，等回执即可</li>
+          </ul>
+        </article>
+      </div>
+      <p class="muted disclaimer">免责声明：本工具仅供学习交流。使用后果由用户自行承担。</p>
     </section>
   </main>
 
-  <section class="guide" id="about">
-    <p class="kicker">ABOUT</p>
-    <h2>关于迈步</h2>
-    <p class="guide-lead">工具说明与使用方法。迈步通过 API 把你指定的步数交给华米，用来更新 Zepp Life 里今天的步数。</p>
-    <div class="guide-grid">
-      <article>
-        <h3>功能介绍</h3>
-        <p>输入自己的账号、密码和目标步数，由 Worker 直连华米登录并上传。不定时、不入库，走完这一趟就结束。</p>
-      </article>
-      <article>
-        <h3>使用方法</h3>
-        <ol>
-          <li>输入注册 Zepp Life 时用的邮箱或手机号</li>
-          <li>用手打该账号的密码，不要用浏览器自动填充。密码不对大约 1–2 秒就会返回，等回执即可</li>
-          <li>点快捷档或「随机」，不用拉滑块；也可以自己填 1 – 98,800</li>
-          <li>点「走这一趟」。出现「这一趟到了」才算成功</li>
-          <li>打开 Zepp Life 下拉刷新核对</li>
-        </ol>
-      </article>
-      <article>
-        <h3>服务指标</h3>
-        <p>接口版本 API v1.0。顶部成功率 99.9%，中位耗时按 ≤2s 展示。</p>
-        <p>华米登录 + 换票 + 上传通常很快；密码不对等回执即可，大约 1–2 秒。</p>
-        <p>同一网络请别连点，接口有短时限流。</p>
-      </article>
-      <article>
-        <h3>注意事项</h3>
-        <ul>
-          <li>仅供学习、测试，请只动自己的号</li>
-          <li>不要把步数拉得太离谱，以免被判定异常</li>
-          <li>账号密码只用于这一次请求，页面和 Worker 都不保存</li>
-          <li>要用 Zepp Life 密码，不是小米账号快捷登录，也不是看板站长密码</li>
-        </ul>
-      </article>
-    </div>
-    <p class="disclaimer">免责声明：本工具仅供学习交流。使用后果由用户自行承担。请遵守相关法律法规，不得用于非法用途。开发者不对因使用本工具造成的任何直接或间接损失负责。</p>
-  </section>
-
   <script src="./guest-config.js"></script>
-  <script src="./theme.js?v=5"></script>
-  <script src="./dongdong.js?v=21"></script>
+  <script src="./theme.js?v=6"></script>
+  <script src="./dongdong.js?v=23"></script>
 </body>
 </html>
