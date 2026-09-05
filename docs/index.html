@@ -44,7 +44,7 @@
     <div class="top-meta">
       <time id="clock">--:--</time>
       <button id="theme-btn" type="button" title="跟随系统，点击改为浅色">系统</button>
-      <button id="refresh" type="button">刷新</button>
+      <button id="refresh" type="button" title="向华米读取当前步数">刷新</button>
     </div>
   </header>
 
@@ -57,7 +57,7 @@
         </div>
         <div class="step-number"><strong id="last-step">—</strong><span>步</span></div>
         <div class="bar" aria-hidden="true"><i id="bar-value"></i></div>
-        <span class="muted" id="step-date">正在读取…</span>
+        <span class="muted" id="step-date">仓库记录，点刷新查看当前</span>
         <p class="cron-last muted" id="cron-last">上次定时 —</p>
       </div>
       <dl class="facts">
@@ -99,7 +99,7 @@
         <button id="usage-now" type="button">查看用量</button>
       </div>
       <div class="owner-meta">
-        <span>今日步数先问华米；连不上就显示仓库记下的定时上传。马上刷步会立刻改数字。</span>
+        <span>默认显示仓库记下的定时上传。点右上角刷新才问华米当前步数。</span>
         <a href="./settings.html">改定时参数 →</a>
       </div>
       <p id="ops-status" class="banner" hidden></p>
@@ -159,6 +159,6 @@
   <script src="./guest-config.js"></script>
   <script src="./api.js"></script>
   <script src="./theme.js?v=6"></script>
-  <script src="./app.js?v=8"></script>
+  <script src="./app.js?v=9"></script>
 </body>
 </html>

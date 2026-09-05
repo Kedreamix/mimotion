@@ -131,7 +131,7 @@
     const date = lastRepo.lastStepDate || "";
     const when = date === todayBJ() ? "今日定时上传" : (date || "仓库记录");
     paintSteps(lastRepo.lastStep);
-    $("step-date").textContent = `${when} · 仓库记下的，不是实时 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+    $("step-date").textContent = `${when} · 仓库记下的，不是实时 · 点刷新查看当前 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
     writeLocalSteps({
       date: date || todayBJ(),
       steps: lastRepo.lastStep,
@@ -146,10 +146,10 @@
       lastHuami = today;
       paintSteps(today.steps);
       writeLocalSteps({ ...today, source: today.source || "huami" });
-      const when = today.date === todayBJ() ? "华米当天" : (today.date || "华米");
+      const when = today.date === todayBJ() ? "华米当前" : (today.date || "华米");
       $("step-date").textContent = today.stale
         ? `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`
-        : `${when} · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+        : `${when} · 刚刷新 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
       return;
     }
     const picked = schedule.pickTodayDisplay({
@@ -199,8 +199,8 @@
       : `上次定时 ${cron.lastStep.toLocaleString("zh-CN")} · 仓库记录，不是实时`;
   }
 
-  async function loadTodaySteps(fresh) {
-    const url = guestEndpoint(fresh ? "/today-steps?fresh=1" : "/today-steps");
+  async function loadTodaySteps() {
+    const url = guestEndpoint("/today-steps");
     if (!url) return { error: "刷步接口暂不可用" };
     try {
       const res = await fetch(url, { cache: "no-store", mode: "cors" });
@@ -362,23 +362,12 @@
     };
   }
 
-  function latestSuccessAt(runs) {
-    const latest = (runs || []).find((r) => r.name === "刷步数" && r.conclusion === "success");
-    if (!latest) return 0;
-    const t = new Date(latest.updated_at || latest.created_at).getTime();
-    return Number.isFinite(t) ? t : 0;
-  }
-
-  async function refresh() {
+  async function loadDashboard({ queryHuami = false } = {}) {
     $("refresh").disabled = true;
     try {
       const snapshot = await loadSnapshot();
       if (snapshot && snapshot.params) applyParams(snapshot.params);
       applyRepoSteps(cronFromData(snapshot));
-      const todayPromise = loadTodaySteps(false).then((today) => {
-        applyHuamiSteps(today);
-        return today;
-      });
       let data = snapshot;
       let usedSnapshot = false;
       try {
@@ -390,11 +379,9 @@
       const cron = cronFromData(data);
       applyRepoSteps(cron);
       renderStatus(cron, data.runs || []);
-      const today = await todayPromise;
-      const runAt = latestSuccessAt(data.runs || []);
-      const fetched = Number(today && today.fetched_at) || 0;
-      if (fetched && runAt > fetched) {
-        applyHuamiSteps(await loadTodaySteps(true));
+      if (queryHuami) {
+        $("step-date").textContent = "正在向华米读取当前步数…";
+        applyHuamiSteps(await loadTodaySteps());
       }
       if (usedSnapshot) {
         $("status-detail").textContent = "实时接口暂不可用，正在显示快照";
@@ -408,7 +395,7 @@
     }
   }
 
-  $("refresh").addEventListener("click", () => refresh());
+  $("refresh").addEventListener("click", () => loadDashboard({ queryHuami: true }));
   function tick() {
     const p = beijingParts();
     $("clock").textContent = `${pad(p.h)}:${pad(p.min)}`;
@@ -543,8 +530,5 @@
   }
 
   checkOwnerSetup();
-  const boot = readLocalSteps();
-  if (boot && boot.source === "huami") applyHuamiSteps(boot);
-  else if (boot) applyRepoSteps({ lastStep: boot.steps, lastStepDate: boot.date });
-  refresh();
+  loadDashboard({ queryHuami: false });
 })();
