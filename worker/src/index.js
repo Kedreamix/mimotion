@@ -7,8 +7,15 @@ import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, t
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
 
 export const TODAY_STEPS_CACHE_URL = "https://mimotion.internal/today-steps";
-export const TODAY_STEPS_TTL_SECONDS = 180;
-export const TODAY_STEPS_STALE_SECONDS = 1800;
+export const TODAY_STEPS_TTL_MIN_SECONDS = 300;
+export const TODAY_STEPS_TTL_MAX_SECONDS = 600;
+export const TODAY_STEPS_STALE_SECONDS = 7200;
+
+export function pickTodayStepsFreshMs(now = Date.now(), random = Math.random) {
+  const span = TODAY_STEPS_TTL_MAX_SECONDS - TODAY_STEPS_TTL_MIN_SECONDS;
+  const seconds = TODAY_STEPS_TTL_MIN_SECONDS + Math.floor(random() * (span + 1));
+  return now + seconds * 1000;
+}
 
 const limiterStore = new Map();
 const limiter = createLimiter(limiterStore, { limit: 8, windowMs: 10 * 60 * 1000 });
@@ -174,20 +181,24 @@ function resolveCache(ctx) {
 }
 
 function todayStepsPayload(date, steps) {
+  const fetchedAt = Date.now();
   return {
     ok: true,
     date,
     steps: Number(steps) || 0,
     source: "huami",
-    fetched_at: Date.now(),
+    fetched_at: fetchedAt,
+    fresh_until: pickTodayStepsFreshMs(fetchedAt),
   };
 }
 
 function isFreshTodaySteps(body) {
   if (!body || body.ok !== true) return false;
+  const until = Number(body.fresh_until);
+  if (Number.isFinite(until) && until > 0) return Date.now() < until;
   const t = Number(body.fetched_at);
   if (!Number.isFinite(t) || t <= 0) return false;
-  return Date.now() - t < TODAY_STEPS_TTL_SECONDS * 1000;
+  return Date.now() - t < TODAY_STEPS_TTL_MIN_SECONDS * 1000;
 }
 
 async function matchTodayStepsCache(cache) {

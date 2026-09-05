@@ -129,6 +129,7 @@
         source: body.source || "huami",
         stale: Boolean(body.stale),
         warning: body.warning || "",
+        fetched_at: Number(body.fetched_at) || 0,
       };
     } catch {
       return { error: "刷步接口暂时连不上" };
@@ -274,12 +275,19 @@
     };
   }
 
-  async function refresh(fresh = false) {
+  function latestSuccessAt(runs) {
+    const latest = (runs || []).find((r) => r.name === "刷步数" && r.conclusion === "success");
+    if (!latest) return 0;
+    const t = new Date(latest.updated_at || latest.created_at).getTime();
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  async function refresh() {
     $("refresh").disabled = true;
     try {
       const snapshot = await loadSnapshot();
       if (snapshot && snapshot.params) applyParams(snapshot.params);
-      const todayPromise = loadTodaySteps(fresh).then((today) => {
+      const todayPromise = loadTodaySteps(false).then((today) => {
         applyHuamiSteps(today);
         return today;
       });
@@ -293,7 +301,12 @@
       }
       const cron = schedule.parseCronFile(data.cronText || "");
       renderStatus(cron, data.runs || []);
-      await todayPromise;
+      const today = await todayPromise;
+      const runAt = latestSuccessAt(data.runs || []);
+      const fetched = Number(today && today.fetched_at) || Number(lastHuami && lastHuami.fetched_at) || 0;
+      if (runAt > fetched) {
+        applyHuamiSteps(await loadTodaySteps(true));
+      }
       if (usedSnapshot) {
         $("status-detail").textContent = "实时接口暂不可用，正在显示快照";
       }
@@ -306,7 +319,7 @@
     }
   }
 
-  $("refresh").addEventListener("click", () => refresh(true));
+  $("refresh").addEventListener("click", () => refresh());
   function tick() {
     const p = beijingParts();
     $("clock").textContent = `${pad(p.h)}:${pad(p.min)}`;
@@ -348,7 +361,12 @@
       }
       showOps(body.message || `已同步 ${body.step} 步`, true);
       if (Number.isFinite(Number(body.step))) {
-        applyHuamiSteps({ date: todayBJ(), steps: Number(body.step), source: "huami" });
+        applyHuamiSteps({
+          date: todayBJ(),
+          steps: Number(body.step),
+          source: "huami",
+          fetched_at: Date.now(),
+        });
       }
     } catch (err) {
       $("owner-pwd").value = "";
@@ -436,5 +454,5 @@
   }
 
   checkOwnerSetup();
-  refresh(false);
+  refresh();
 })();
