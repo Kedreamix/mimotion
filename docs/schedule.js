@@ -43,7 +43,7 @@
     } catch {
       state = {};
     }
-    const accounts = Object.values(state);
+    const accounts = Object.values(state).filter((item) => item && typeof item === "object");
     const last = accounts.slice().sort((a, b) => String(b.last_step_date || "").localeCompare(String(a.last_step_date || "")))[0] || {};
     return {
       lastSyncText: sync,
@@ -58,11 +58,41 @@
     };
   }
 
+  function pickTodayDisplay({ huami, local, repo } = {}) {
+    if (huami && Number.isFinite(Number(huami.steps))) {
+      return {
+        steps: Number(huami.steps),
+        date: huami.date || "",
+        source: "huami",
+        stale: Boolean(huami.stale),
+        fetched_at: Number(huami.fetched_at) || 0,
+      };
+    }
+    if (repo && Number(repo.lastStep) > 0) {
+      return {
+        steps: Number(repo.lastStep),
+        date: repo.lastStepDate || "",
+        source: "repo",
+        fetched_at: 0,
+      };
+    }
+    if (local && Number.isFinite(Number(local.steps))) {
+      return {
+        steps: Number(local.steps),
+        date: local.date || "",
+        source: "local",
+        fetched_at: Number(local.fetched_at) || 0,
+      };
+    }
+    return null;
+  }
+
   const api = {
     parseHoursBlock,
     unionHours,
     nextSlot,
     parseCronFile,
+    pickTodayDisplay,
   };
   root.MimoSchedule = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

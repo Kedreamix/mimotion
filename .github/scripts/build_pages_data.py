@@ -18,6 +18,29 @@ REPO = os.environ.get("GITHUB_REPOSITORY", f"{OWNER}/mimotion").split("/")[-1]
 TOKEN = os.environ.get("GITHUB_TOKEN", "")
 OUT = Path(os.environ.get("PAGES_DATA_PATH", "docs/data.json"))
 API = f"https://api.github.com/repos/{OWNER}/{REPO}"
+STEP_STATE_MARKER = "---STEP_STATE---"
+
+
+def latest_repo_step(cron_text: str) -> tuple[int, str]:
+    if STEP_STATE_MARKER not in (cron_text or ""):
+        return 0, ""
+    raw = cron_text.split(STEP_STATE_MARKER, 1)[1].strip()
+    try:
+        state = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return 0, ""
+    if not isinstance(state, dict):
+        return 0, ""
+    accounts = [item for item in state.values() if isinstance(item, dict)]
+    accounts.sort(key=lambda item: str(item.get("last_step_date") or ""), reverse=True)
+    if not accounts:
+        return 0, ""
+    last = accounts[0]
+    try:
+        step = int(last.get("last_step") or 0)
+    except (TypeError, ValueError):
+        step = 0
+    return step, str(last.get("last_step_date") or "")
 
 
 def fetch(url: str) -> dict:
@@ -33,11 +56,14 @@ def fetch(url: str) -> dict:
 def main() -> None:
     cron_path = Path("cron_change_time")
     cron_text = cron_path.read_text(encoding="utf-8") if cron_path.exists() else ""
+    last_step, last_step_date = latest_repo_step(cron_text)
     runs_raw = fetch(f"{API}/actions/runs?per_page=20")
     payload = {
         "repo": f"{OWNER}/{REPO}",
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cronText": cron_text,
+        "lastStep": last_step,
+        "lastStepDate": last_step_date,
         "params": collect_public_params(),
         "runs": [
             {
