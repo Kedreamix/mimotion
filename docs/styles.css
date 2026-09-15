@@ -567,6 +567,25 @@ body { letter-spacing: -0.01em; }
   font-size: 12px;
   line-height: 1.45;
 }
+.refresh-steps {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #1a0b06;
+  background: var(--orange);
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(255, 104, 70, 0.18);
+}
+.refresh-steps:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 .facts { gap: 0; padding: 5px 0; }
 .facts div { padding: 2px 14px; }
 .facts div:not(:first-child) { padding-left: 14px; }
@@ -783,6 +802,8 @@ input:focus, select:focus {
   .nav { order: 3; width: 100%; margin: 2px 0 0; }
   .nav a { flex: 1; text-align: center; }
   .top-meta { margin-left: auto; }
+  #refresh { display: none; }
+  .refresh-steps { width: 100%; max-width: none; }
   #clock { font-size: 13px; }
   .glance { grid-template-columns: 1fr; padding: 20px; min-height: 0; }
   .facts { grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); padding-top: 14px; }
@@ -1081,7 +1102,8 @@ html[data-skin="pikachu"] #theme-btn {
   box-shadow: 0 6px 18px rgba(247, 217, 72, .17);
 }
 html[data-skin="pikachu"] .guest-jump .run-button,
-html[data-skin="pikachu"] button.primary {
+html[data-skin="pikachu"] button.primary,
+html[data-skin="pikachu"] .refresh-steps {
   background: linear-gradient(135deg, #ffe873, #f2bb16);
   color: #1a1408;
   box-shadow: 0 10px 26px rgba(247, 217, 72, .18);
