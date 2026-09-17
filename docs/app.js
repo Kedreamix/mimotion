@@ -161,7 +161,8 @@
       if (today.stale) {
         $("step-date").textContent = `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
       } else if (live) {
-        $("step-date").textContent = `${when} · 刚刷新 · 已记下`;
+        const p = beijingParts();
+        $("step-date").textContent = `${when} · 刚刷新 ${pad(p.h)}:${pad(p.min)} · 已记下`;
       } else {
         $("step-date").textContent = `${when} · 上次刷新记下的 · 点刷新再问`;
       }
@@ -217,8 +218,10 @@
   async function loadTodaySteps() {
     const url = guestEndpoint("/today-steps");
     if (!url) return { error: "刷步接口暂不可用" };
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
     try {
-      const res = await fetch(url, { cache: "no-store", mode: "cors" });
+      const res = await fetch(url, { cache: "no-store", mode: "cors", signal: ctrl.signal });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) {
         return { error: body.error || `读取失败（${res.status}）` };
@@ -233,8 +236,11 @@
         warning: body.warning || "",
         fetched_at: Number(body.fetched_at) || 0,
       };
-    } catch {
+    } catch (err) {
+      if (err && err.name === "AbortError") return { error: "华米读取超时，请再点一次" };
       return { error: "刷步接口暂时连不上" };
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -361,9 +367,18 @@
   }
 
   async function fetchJSON(url) {
-    const res = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
-    if (!res.ok) throw new Error(`${res.status} ${url}`);
-    return res.json();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(url, {
+        headers: { Accept: "application/vnd.github+json" },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error(`${res.status} ${url}`);
+      return res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function loadSnapshot() {
@@ -397,8 +412,29 @@
     };
   }
 
-  async function loadDashboard({ queryHuami = false } = {}) {
-    $("refresh").disabled = true;
+  function refreshButtons() {
+    return [$("refresh"), $("refresh-steps")].filter(Boolean);
+  }
+
+  function setRefreshBusy(busy) {
+    refreshButtons().forEach((btn) => {
+      btn.disabled = busy;
+    });
+    const stepsBtn = $("refresh-steps");
+    if (stepsBtn) stepsBtn.textContent = busy ? "正在读取…" : "查看当前步数";
+  }
+
+  async function queryHuamiNow() {
+    setRefreshBusy(true);
+    $("step-date").textContent = "正在向华米读取当前步数…";
+    try {
+      applyHuamiSteps(await loadTodaySteps(), { live: true });
+    } finally {
+      setRefreshBusy(false);
+    }
+  }
+
+  async function loadDashboard() {
     try {
       restoreLocalHuami();
       const snapshot = await loadSnapshot();
@@ -415,16 +451,11 @@
       const cron = cronFromData(data);
       applyRepoSteps(cron);
       renderStatus(cron, data.runs || []);
-      if (queryHuami) {
-        $("step-date").textContent = "正在向华米读取当前步数…";
-        applyHuamiSteps(await loadTodaySteps(), { live: true });
-      } else {
-        const recorded = await loadLastSteps();
-        if (recorded && recorded.date === todayBJ()) {
-          const localAt = Number(lastHuami && lastHuami.fetched_at) || 0;
-          if (!lastHuami || lastHuami.date !== todayBJ() || recorded.fetched_at >= localAt) {
-            applyHuamiSteps(recorded);
-          }
+      const recorded = await loadLastSteps();
+      if (recorded && recorded.date === todayBJ()) {
+        const localAt = Number(lastHuami && lastHuami.fetched_at) || 0;
+        if (!lastHuami || lastHuami.date !== todayBJ() || recorded.fetched_at >= localAt) {
+          applyHuamiSteps(recorded);
         }
       }
       if (usedSnapshot) {
@@ -434,12 +465,12 @@
       $("status-card").className = "glance bad";
       $("status-text").textContent = "读取失败";
       $("status-detail").textContent = String(err.message || err);
-    } finally {
-      $("refresh").disabled = false;
     }
   }
 
-  $("refresh").addEventListener("click", () => loadDashboard({ queryHuami: true }));
+  refreshButtons().forEach((btn) => {
+    btn.addEventListener("click", () => queryHuamiNow());
+  });
   function tick() {
     const p = beijingParts();
     $("clock").textContent = `${pad(p.h)}:${pad(p.min)}`;
@@ -574,5 +605,5 @@
   }
 
   checkOwnerSetup();
-  loadDashboard({ queryHuami: false });
+  loadDashboard();
 })();
