@@ -171,18 +171,67 @@ export function formBody(data) {
     .join("&");
 }
 
+function armTimeout(ms) {
+  let timer;
+  const promise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error("华米接口超时，请再试一次");
+      err.name = "HuamiTimeout";
+      reject(err);
+    }, ms);
+    if (timer && typeof timer.unref === "function") timer.unref();
+  });
+  promise.catch(() => {});
+  return {
+    promise,
+    cancel() {
+      clearTimeout(timer);
+    },
+  };
+}
+
+function isHuamiTimeout(err) {
+  return Boolean(err) && (
+    err.name === "HuamiTimeout"
+    || err.name === "AbortError"
+    || String(err.message || "").includes("aborted")
+    || String(err.message || "").includes("华米接口超时")
+  );
+}
+
+export function fetchTimeoutMs(value, fallback = 12000) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// Workers 里 AbortController 经常取消不了已经发出的 subrequest，只靠 abort 会一直挂到外层截止。
+// 这里用定时器抢跑，保证单次请求到点就失败，调用方才能换参数再试。
 async function timedFetch(fetchImpl, url, options, ms = 12000) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ms);
+  const timeout = armTimeout(ms);
+  const abortTimer = setTimeout(() => ctrl.abort(), ms);
+  if (abortTimer && typeof abortTimer.unref === "function") abortTimer.unref();
   try {
-    return await fetchImpl(url, { ...options, signal: ctrl.signal });
+    const res = await Promise.race([
+      Promise.resolve(fetchImpl(url, { ...options, signal: ctrl.signal })),
+      timeout.promise,
+    ]);
+    const text = await Promise.race([
+      res.text(),
+      timeout.promise,
+    ]);
+    return {
+      status: res.status,
+      headers: res.headers,
+      text: async () => text,
+      json: async () => JSON.parse(text || "null"),
+    };
   } catch (err) {
-    if (err && (err.name === "AbortError" || String(err.message || "").includes("aborted"))) {
-      throw new Error("华米接口超时，请再试一次");
-    }
+    if (isHuamiTimeout(err)) throw new Error("华米接口超时，请再试一次");
     throw err;
   } finally {
-    clearTimeout(timer);
+    clearTimeout(abortTimer);
+    timeout.cancel();
   }
 }
 
@@ -191,7 +240,7 @@ export function applyBandTemplate(step, date) {
   return dated.replace(/ttl%5C%22%3A(.*?)%2C%5C%22dis/, `ttl%5C%22%3A${step}%2C%5C%22dis`);
 }
 
-async function loginAccessToken(user, password, fetchImpl) {
+async function loginAccessToken(user, password, fetchImpl, timeoutMs) {
   const query = formBody({
     emailOrPhone: user,
     password,
@@ -215,7 +264,7 @@ async function loginAccessToken(user, password, fetchImpl) {
       "hm-privacy-ceip": "false",
     },
     body: cipher,
-  });
+  }, timeoutMs);
   if (res.status !== 303) {
     throw new Error(`登录异常，status: ${res.status}`);
   }
@@ -228,7 +277,7 @@ async function loginAccessToken(user, password, fetchImpl) {
   return decodeURIComponent(access);
 }
 
-async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
+async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl, timeoutMs) {
   const data = isPhone
     ? {
       app_name: "com.xiaomi.hm.health",
@@ -267,7 +316,7 @@ async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
       "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
     },
     body: formBody(data),
-  });
+  }, timeoutMs);
   const body = await res.json();
   if (body.result !== "ok") {
     throw new Error(`客户端登录失败：${body.result || res.status}`);
@@ -280,7 +329,7 @@ async function grantLoginTokens(accessToken, deviceId, isPhone, fetchImpl) {
   };
 }
 
-async function postBandData(step, appToken, userId, fetchImpl, now) {
+async function postBandData(step, appToken, userId, fetchImpl, now, timeoutMs) {
   const t = beijingTs(now);
   const dataJson = applyBandTemplate(String(step), todayBeijing(now));
   const res = await timedFetch(fetchImpl, `${DEFAULT_BAND_HOST}/v1/data/band_data.json?&t=${t}&r=${uuid()}`, {
@@ -290,7 +339,7 @@ async function postBandData(step, appToken, userId, fetchImpl, now) {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: `userid=${encodeURIComponent(userId)}&last_sync_data_time=1597306380&device_type=0&last_deviceid=DA932FFFFE8816E7&data_json=${dataJson}`,
-  });
+  }, timeoutMs);
   if (res.status !== 200) {
     throw new Error(`提交步数异常：${res.status}`);
   }
@@ -320,21 +369,27 @@ function huamiStatusError(prefix, status, text) {
   return new Error(hint ? `${prefix}${status} ${hint}` : `${prefix}${status}`);
 }
 
-async function getBandSummary(appToken, userId, date, fetchImpl) {
+async function getBandSummary(appToken, userId, date, fetchImpl, timeoutMs) {
   const attempts = [
     { device_type: "android_phone" },
     { device_type: "0", byteLength: "8" },
   ];
   let lastError = new Error("读取步数异常");
   for (const extra of attempts) {
-    const res = await timedFetch(fetchImpl, `${DEFAULT_BAND_HOST}/v1/data/band_data.json?${summaryQuery(userId, date, extra)}`, {
-      method: "GET",
-      headers: {
-        apptoken: appToken,
-        appname: "com.xiaomi.hm.health",
-        "user-agent": UA,
-      },
-    });
+    let res;
+    try {
+      res = await timedFetch(fetchImpl, `${DEFAULT_BAND_HOST}/v1/data/band_data.json?${summaryQuery(userId, date, extra)}`, {
+        method: "GET",
+        headers: {
+          apptoken: appToken,
+          appname: "com.xiaomi.hm.health",
+          "user-agent": UA,
+        },
+      }, timeoutMs);
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
     const text = await res.text();
     if (res.status !== 200) {
       lastError = huamiStatusError("读取步数异常：", res.status, text);
@@ -355,27 +410,38 @@ async function getBandSummary(appToken, userId, date, fetchImpl) {
   throw lastError;
 }
 
-export async function fetchTodaySteps({ user, password, now, fetchImpl }) {
+export async function fetchTodaySteps({ user, password, now, fetchImpl, fetchTimeoutMs: timeoutRaw }) {
   const account = normalizeUser(user);
   const pwd = String(password || "").trim();
   if (!account || !pwd) {
     throw new Error("请填写自己的 Zepp Life 账号和密码");
   }
+  const hasOverride = Number.isFinite(Number(timeoutRaw)) && Number(timeoutRaw) > 0;
+  const timeoutMs = hasOverride ? Number(timeoutRaw) : 8000;
+  const summaryTimeout = hasOverride ? Number(timeoutRaw) : 18000;
   const isPhone = account.startsWith("+86");
   const deviceId = uuid();
-  const access = await loginAccessToken(account, pwd, fetchImpl);
-  const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
-  const date = todayBeijing(now);
-  const body = await getBandSummary(tokens.appToken, tokens.userId, date, fetchImpl);
-  return {
-    date,
-    steps: stepsFromBandData(body, date),
-    source: "huami",
-    user: maskUser(account),
-  };
+  let stage = "login";
+  try {
+    const access = await loginAccessToken(account, pwd, fetchImpl, timeoutMs);
+    stage = "grant";
+    const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl, timeoutMs);
+    stage = "summary";
+    const date = todayBeijing(now);
+    const body = await getBandSummary(tokens.appToken, tokens.userId, date, fetchImpl, summaryTimeout);
+    return {
+      date,
+      steps: stepsFromBandData(body, date),
+      source: "huami",
+      user: maskUser(account),
+    };
+  } catch (err) {
+    err.stage = err.stage || stage;
+    throw err;
+  }
 }
 
-export async function guestSync({ user, password, minStep, maxStep, step, now, fetchImpl }) {
+export async function guestSync({ user, password, minStep, maxStep, step, now, fetchImpl, fetchTimeoutMs: timeoutRaw }) {
   const account = normalizeUser(user);
   const pwd = String(password || "").trim();
   if (!account || !pwd) {
@@ -394,11 +460,12 @@ export async function guestSync({ user, password, minStep, maxStep, step, now, f
   try {
     const isPhone = account.startsWith("+86");
     const deviceId = uuid();
+    const timeoutMs = fetchTimeoutMs(timeoutRaw);
     stage = "login";
-    const access = await loginAccessToken(account, pwd, fetchImpl);
+    const access = await loginAccessToken(account, pwd, fetchImpl, timeoutMs);
     stamp("login");
     stage = "grant";
-    const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl);
+    const tokens = await grantLoginTokens(access, deviceId, isPhone, fetchImpl, timeoutMs);
     stamp("grant");
     const exact = step != null && step !== "" ? clampStep(step) : null;
     if (step != null && step !== "" && exact == null) {
@@ -410,7 +477,7 @@ export async function guestSync({ user, password, minStep, maxStep, step, now, f
     };
     const chosen = exact ?? pickStep(range.min, range.max);
     stage = "upload";
-    await postBandData(chosen, tokens.appToken, tokens.userId, fetchImpl, now);
+    await postBandData(chosen, tokens.appToken, tokens.userId, fetchImpl, now, timeoutMs);
     stamp("upload");
     return {
       step: chosen,
