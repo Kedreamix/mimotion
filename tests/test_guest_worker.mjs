@@ -133,6 +133,7 @@ function mockFetch(plan) {
         assert.equal(options.headers[key], value);
       }
     }
+    if (item.hang) return new Promise(() => {});
     return new Response(item.body ?? null, {
       status: item.status,
       headers: item.headers || { "content-type": "application/json" },
@@ -685,6 +686,45 @@ test("GET /today-steps stays on the CN upload host even if login maps another re
   ));
   assert.equal(payload.status, 200);
   assert.equal(payload.body.steps, 321);
+});
+
+test("GET /today-steps retries summary when the first read never answers", async () => {
+  const payload = await read(await handleRequest(
+    todayStepsRequest(),
+    ownerEnv({ USER: "a@b.com", PWD: "zepp", HUAMI_FETCH_MS: "30" }),
+    mockFetch([
+      {
+        expectUrl: /api-user\.zepp\.com/,
+        expectMethod: "POST",
+        status: 303,
+        headers: { Location: "https://s3-us-west-2.amazonaws.com/hm-registration/successsignin.html?access=tok123&" },
+      },
+      {
+        expectUrl: /account\.huami\.com/,
+        expectMethod: "POST",
+        status: 200,
+        body: JSON.stringify({ result: "ok", token_info: { login_token: "l", app_token: "app-token", user_id: "u1" } }),
+      },
+      {
+        expectUrl: /device_type=android_phone/,
+        expectMethod: "GET",
+        hang: true,
+      },
+      {
+        expectUrl: /device_type=0/,
+        expectMethod: "GET",
+        status: 200,
+        body: JSON.stringify({
+          code: 1,
+          message: "success",
+          data: [{ date: todayBeijing(), summary: JSON.stringify({ stp: { ttl: 6543 } }) }],
+        }),
+      },
+    ]),
+  ));
+  assert.equal(payload.status, 200);
+  assert.equal(payload.body.ok, true);
+  assert.equal(payload.body.steps, 6543);
 });
 
 test("GET /today-steps retries summary with device_type=0 if android_phone returns 400", async () => {

@@ -3,7 +3,7 @@ import { clientKey, createLimiter } from "./rate-limit.js";
 import { exchangeGithubCode, githubAuthorizeUrl, oauthConfigured, pagesRedirectUri } from "./oauth.js";
 import { safeEqual } from "./secret.js";
 import { hasAnalytics, hasD1, readUsage, recordUsage } from "./usage.js";
-import { fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, todayBeijing } from "./zepp.js";
+import { fetchTimeoutMs, fetchTodaySteps, guestSync, maskUser, normalizeUser, stepRangeByTime, todayBeijing } from "./zepp.js";
 import { hydrateStats, publicStats, recordGuest } from "./stats.js";
 import { readLastSteps, saveLastSteps } from "./today-steps-store.js";
 
@@ -76,7 +76,7 @@ function logGuest(entry) {
   }));
 }
 
-async function runSync(user, password, body, fetchImpl) {
+async function runSync(user, password, body, fetchImpl, timeoutMs) {
   return guestSync({
     user,
     password,
@@ -85,6 +85,7 @@ async function runSync(user, password, body, fetchImpl) {
     step: body.step,
     now: new Date(),
     fetchImpl,
+    fetchTimeoutMs: timeoutMs,
   });
 }
 
@@ -212,7 +213,8 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
         password: account.password,
         now: new Date(),
         fetchImpl,
-      }), 15000);
+        fetchTimeoutMs: env.HUAMI_FETCH_MS,
+      }), fetchTimeoutMs(env.TODAY_STEPS_DEADLINE_MS, 28000));
       const payload = {
         date: result.date,
         steps: Number(result.steps) || 0,
@@ -342,6 +344,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
           step: body.step,
           now,
           fetchImpl,
+          fetchTimeoutMs: env.HUAMI_FETCH_MS,
         }), deadlineMs));
       }
       const last = results[results.length - 1];
@@ -376,7 +379,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch, ctx = 
       const rawDeadline = Number(env.GUEST_DEADLINE_MS);
       const deadlineMs = Number.isFinite(rawDeadline) && rawDeadline > 0 ? rawDeadline : 20000;
       try {
-        result = await withDeadline(runSync(body.user, body.password, body, fetchImpl), deadlineMs);
+        result = await withDeadline(runSync(body.user, body.password, body, fetchImpl, env.HUAMI_FETCH_MS), deadlineMs);
         logGuest({
           ok: true,
           user: result.user || receivedUser,
