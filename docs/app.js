@@ -126,7 +126,7 @@
   function applyRepoSteps(cron) {
     if (cron && Number(cron.lastStep) > 0) lastRepo = cron;
     const huamiIsToday = lastHuami && lastHuami.date === todayBJ();
-    if (huamiIsToday) return;
+    if (huamiIsToday || $("step-date").classList.contains("live-wait")) return;
     if (!lastRepo || !Number(lastRepo.lastStep)) return;
     const date = lastRepo.lastStepDate || "";
     const when = date === todayBJ() ? "今日定时上传" : (date || "仓库记录");
@@ -150,6 +150,12 @@
     $("step-date").textContent = "华米当前 · 上次刷新记下的 · 点刷新再问";
   }
 
+  function markStepLine(kind, text) {
+    const el = $("step-date");
+    el.className = kind ? `muted live-${kind}` : "muted";
+    el.textContent = text;
+  }
+
   function applyHuamiSteps(today, { live = false } = {}) {
     const usable = today && Number.isFinite(Number(today.steps))
       && today.source !== "repo" && today.source !== "local";
@@ -158,12 +164,13 @@
       paintSteps(today.steps);
       writeLocalSteps({ ...today, source: today.source || "huami" });
       const when = today.date === todayBJ() ? "华米当前" : (today.date || "华米");
+      const shown = Number(today.steps).toLocaleString("zh-CN");
       if (today.stale) {
-        $("step-date").textContent = `${when} · 刚才读不到，先显示这份 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+        markStepLine("bad", `${when} · 刚才读不到，先显示 ${shown}`);
       } else if (live) {
-        $("step-date").textContent = `${when} · 刚刷新 · 已记下`;
+        markStepLine("ok", `${when} · 刚问到 ${shown} · 已记下`);
       } else {
-        $("step-date").textContent = `${when} · 上次刷新记下的 · 点刷新再问`;
+        markStepLine("", `${when} · 上次刷新记下的 · 点刷新再问`);
       }
       return;
     }
@@ -175,28 +182,28 @@
     if (picked) {
       paintSteps(picked.steps);
       if (picked.source === "huami") {
-        $("step-date").textContent = today && today.error
+        markStepLine("bad", today && today.error
           ? `华米暂时读不到：${today.error}`
-          : "华米暂时读不到，仍显示刚才的数";
+          : "华米暂时读不到，仍显示刚才的数");
         return;
       }
       if (picked.source === "local") {
-        $("step-date").textContent = today && today.error
+        markStepLine("bad", today && today.error
           ? `本地记下的 ${picked.date || ""} · ${today.error}`
-          : `本地记下的 ${picked.date || ""} · 华米暂时读不到`;
+          : `本地记下的 ${picked.date || ""} · 华米暂时读不到`);
         return;
       }
       const when = picked.date === todayBJ() ? "今日定时上传" : (picked.date || "仓库记录");
-      $("step-date").textContent = today && today.error
+      markStepLine(today && today.error ? "bad" : "", today && today.error
         ? `${when} · ${today.error}`
-        : `${when} · 仓库记下的，不是实时 · 目标 ${stepGoal.toLocaleString("zh-CN")}`;
+        : `${when} · 仓库记下的，不是实时 · 目标 ${stepGoal.toLocaleString("zh-CN")}`);
       return;
     }
     $("last-step").textContent = "—";
     setBar(0);
-    $("step-date").textContent = today && today.error
+    markStepLine(today && today.error ? "bad" : "", today && today.error
       ? `读不到：${today.error}`
-      : "暂无当天步数";
+      : "暂无当天步数");
   }
 
   function applyCronLast(cron) {
@@ -214,11 +221,45 @@
       : `上次定时 ${cron.lastStep.toLocaleString("zh-CN")} · 仓库记录，不是实时`;
   }
 
-  async function loadTodaySteps() {
-    const url = guestEndpoint("/today-steps");
-    if (!url) return { error: "刷步接口暂不可用" };
+  function isPhoneDrop(err) {
+    const msg = String(err && err.message || err).toLowerCase();
+    return msg.includes("failed to fetch")
+      || msg.includes("load failed")
+      || msg.includes("networkerror");
+  }
+
+  function withTimeout(promise, ms) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("timeout")), ms);
+    });
+    return Promise.race([Promise.resolve(promise), timeout]).finally(() => clearTimeout(timer));
+  }
+
+  // iOS Safari 对跨域请求带 cache:"no-store" 会直接 Load failed，页面拿不到正文。
+  // 用查询参数避开缓存，失败再试一次。
+  async function fetchGuest(path, ms = 20000) {
+    const endpoint = guestEndpoint(path);
+    if (!endpoint) return null;
+    const once = () => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), ms);
+      const join = endpoint.includes("?") ? "&" : "?";
+      return fetch(`${endpoint}${join}t=${Date.now()}`, { mode: "cors", signal: ctrl.signal })
+        .finally(() => clearTimeout(timer));
+    };
     try {
-      const res = await fetch(url, { cache: "no-store", mode: "cors" });
+      return await once();
+    } catch (err) {
+      if (!isPhoneDrop(err)) throw err;
+      return await once();
+    }
+  }
+
+  async function loadTodaySteps() {
+    if (!guestEndpoint("/today-steps")) return { error: "刷步接口暂不可用" };
+    try {
+      const res = await fetchGuest("/today-steps");
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) {
         return { error: body.error || `读取失败（${res.status}）` };
@@ -233,16 +274,17 @@
         warning: body.warning || "",
         fetched_at: Number(body.fetched_at) || 0,
       };
-    } catch {
-      return { error: "刷步接口暂时连不上" };
+    } catch (err) {
+      return { error: isPhoneDrop(err) || (err && err.name === "AbortError")
+        ? "手机这头没等到华米回包，请再点一次刷新"
+        : "刷步接口暂时连不上" };
     }
   }
 
   async function loadLastSteps() {
-    const url = guestEndpoint("/last-steps");
-    if (!url) return null;
+    if (!guestEndpoint("/last-steps")) return null;
     try {
-      const res = await fetch(url, { cache: "no-store", mode: "cors" });
+      const res = await fetchGuest("/last-steps", 8000);
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok || !body.recorded) return null;
       const steps = Number(body.steps);
@@ -397,8 +439,26 @@
     };
   }
 
-  async function loadDashboard({ queryHuami = false } = {}) {
-    $("refresh").disabled = true;
+  let huamiFlight = null;
+
+  function refreshSteps() {
+    if (huamiFlight) return huamiFlight;
+    const button = $("refresh");
+    button.disabled = true;
+    button.classList.add("busy");
+    markStepLine("wait", "正在向华米读取当前步数…");
+    huamiFlight = loadTodaySteps().then((today) => {
+      applyHuamiSteps(today, { live: true });
+      return today;
+    }).finally(() => {
+      huamiFlight = null;
+      button.disabled = false;
+      button.classList.remove("busy");
+    });
+    return huamiFlight;
+  }
+
+  async function loadDashboard() {
     try {
       restoreLocalHuami();
       const snapshot = await loadSnapshot();
@@ -406,8 +466,10 @@
       applyRepoSteps(cronFromData(snapshot));
       let data = snapshot;
       let usedSnapshot = false;
+      const livePromise = loadLive();
+      livePromise.catch(() => {});
       try {
-        data = await loadLive();
+        data = await withTimeout(livePromise, 8000);
       } catch (err) {
         if (!snapshot) throw err;
         usedSnapshot = true;
@@ -415,10 +477,7 @@
       const cron = cronFromData(data);
       applyRepoSteps(cron);
       renderStatus(cron, data.runs || []);
-      if (queryHuami) {
-        $("step-date").textContent = "正在向华米读取当前步数…";
-        applyHuamiSteps(await loadTodaySteps(), { live: true });
-      } else {
+      if (!huamiFlight && !$("step-date").classList.contains("live-wait") && !$("step-date").classList.contains("live-ok")) {
         const recorded = await loadLastSteps();
         if (recorded && recorded.date === todayBJ()) {
           const localAt = Number(lastHuami && lastHuami.fetched_at) || 0;
@@ -434,12 +493,10 @@
       $("status-card").className = "glance bad";
       $("status-text").textContent = "读取失败";
       $("status-detail").textContent = String(err.message || err);
-    } finally {
-      $("refresh").disabled = false;
     }
   }
 
-  $("refresh").addEventListener("click", () => loadDashboard({ queryHuami: true }));
+  $("refresh").addEventListener("click", () => refreshSteps());
   function tick() {
     const p = beijingParts();
     $("clock").textContent = `${pad(p.h)}:${pad(p.min)}`;
@@ -574,5 +631,5 @@
   }
 
   checkOwnerSetup();
-  loadDashboard({ queryHuami: false });
+  loadDashboard();
 })();
