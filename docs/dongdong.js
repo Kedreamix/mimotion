@@ -165,9 +165,8 @@
       return;
     }
     try {
-      const res = await fetch(`${endpoint.replace(/\/$/, "")}/health`, {
+      const res = await fetch(`${endpoint.replace(/\/$/, "")}/health?t=${Date.now()}`, {
         mode: "cors",
-        cache: "no-store",
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) throw new Error();
@@ -192,7 +191,6 @@
     const run = () => fetch(`${endpoint.replace(/\/$/, "")}/guest-run`, {
       method: "POST",
       mode: "cors",
-      cache: "no-store",
       credentials: "omit",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),

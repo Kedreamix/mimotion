@@ -510,6 +510,14 @@ body { letter-spacing: -0.01em; }
 .nav a.active { background: rgba(255,255,255,0.08); }
 #refresh { width: 34px; height: 34px; padding: 0; font-size: 0; }
 #refresh::before { content: "↻"; font-size: 18px; }
+#refresh.busy::before {
+  display: inline-block;
+  animation: mimo-spin 0.8s linear infinite;
+}
+@keyframes mimo-spin { to { transform: rotate(360deg); } }
+#step-date.live-wait { color: var(--text); }
+#step-date.live-ok { color: var(--ok); }
+#step-date.live-bad { color: var(--bad); }
 #theme-btn {
   min-width: 52px;
   min-height: 34px;
@@ -777,7 +785,8 @@ input:focus, select:focus {
 
 @media (max-width: 680px) {
   .top, main, footer { width: min(100% - 24px, 820px); }
-  .top { gap: 10px; padding: 14px 0 12px; }
+  .top { gap: 10px; padding: max(14px, env(safe-area-inset-top)) 0 12px; }
+  #refresh { width: 44px; height: 44px; }
   .brand { flex: 1; }
   .brand p { display: none; }
   .nav { order: 3; width: 100%; margin: 2px 0 0; }
