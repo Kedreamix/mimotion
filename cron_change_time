@@ -1,14 +1,14 @@
-trigger by: workflow_run
+trigger by: workflow_dispatch
 current system time:
-UTC: 26-10-31 13:50:28
-北京时间: 26-10-31 21:50:28
+UTC: 26-11-10 16:31:29
+北京时间: 26-11-11 00:31:29
 current cron:
-UTC时间: '34 1,4,7,10,12,14 * * *'
-北京时间: '34 9,12,15,18,20,22 * * *'
-next cron:
 UTC时间: '28 1,4,7,10,12,14 * * *'
 北京时间: '28 9,12,15,18,20,22 * * *'
-next exec time: UTC(14:28) 北京时间(22:28)
+next cron:
+UTC时间: '43 1,4,7,10,12,14 * * *'
+北京时间: '43 9,12,15,18,20,22 * * *'
+next exec time: UTC(1:43) 北京时间(9:43)
 ---STEP_STATE---
 {
   "2febc6aded165332e2ca87a31a9be7bf": {
